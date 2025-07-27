@@ -108,20 +108,10 @@ class DestinationAnalyzerPlugin:
             
             print(f"[DEBUG] 🤖 LLM Response: {llm_result}")
             
-            # Parse structured response (should be valid due to response_format)
+            # Parse structured response from LLM
             analysis = json.loads(llm_result)
             
-            # Validate and clean the response
-            if "destination" not in analysis:
-                analysis["destination"] = "Unknown"
-            if "duration" not in analysis:
-                analysis["duration"] = None
-            if "purpose" not in analysis:
-                analysis["purpose"] = "General Travel"
-            if "missing_info" not in analysis:
-                analysis["missing_info"] = []
-            
-            # Ensure missing_info is properly populated
+            # Calculate missing info based on what we have
             missing_info = []
             if not analysis.get("duration"):
                 missing_info.append("duration")
@@ -179,58 +169,17 @@ class DestinationAnalyzerPlugin:
             
             print(f"[DEBUG] 🔍 Processing clarification: {clarification_lower}")
             
-            # Update duration if it was missing and provided in clarification
+            # Update duration if it was missing - use simple default
             if "duration" in analysis.get("missing_info", []):
-                print(f"[DEBUG] ⏰ Updating duration from clarification")
-                
-                # Simple duration extraction - use default if not specified
-                import re
-                numbers = re.findall(r'\d+', clarification_lower)
-                if numbers and "day" in clarification_lower:
-                    days = numbers[0]
-                    analysis["duration"] = f"{days} days"
-                    print(f"[DEBUG] ✅ Set duration to {days} days")
-                else:
-                    analysis["duration"] = "7 days"  # Default fallback
-                    print(f"[DEBUG] ✅ Set duration to 7 days (default)")
+                print(f"[DEBUG] ⏰ Duration missing - using default: 7 days")
+                analysis["duration"] = "7 days"
+                print(f"[DEBUG] ✅ Set duration to 7 days (default)")
             
-            # Update destination if it was missing and provided in clarification
+            # Update destination if it was missing - use simple default
             if "destination" in analysis.get("missing_info", []):
-                print(f"[DEBUG] 🎯 Updating destination from clarification")
-                
-                # Extract destination from clarification using generic logic
-                destination = "Unknown"
-                
-                # Generic travel keywords that indicate destinations
-                travel_keywords = [
-                    "to ", "visit ", "go to ", "travel to ", "trip to ", "vacation to ",
-                    "in ", "at ", "for ", "destination", "place", "want to go to"
-                ]
-                
-                # Look for destination after travel keywords
-                for keyword in travel_keywords:
-                    if keyword in clarification_lower:
-                        # Find the word after the keyword
-                        parts = clarification_lower.split(keyword)
-                        if len(parts) > 1:
-                            potential_destination = parts[1].split()[0]  # First word after keyword
-                            if potential_destination and len(potential_destination) > 2:
-                                destination = potential_destination.title()
-                                print(f"[DEBUG] ✅ Set destination to {destination}")
-                                break
-                
-                # If no destination found with keywords, try to extract any capitalized word
-                if destination == "Unknown":
-                    words = user_clarification.split()
-                    for word in words:
-                        # Look for capitalized words that might be destinations
-                        if word[0].isupper() and len(word) > 2 and word.lower() not in ['the', 'and', 'for', 'with', 'from', 'this', 'that', 'would', 'like', 'want']:
-                            destination = word
-                            print(f"[DEBUG] ✅ Set destination to {destination}")
-                            break
-                
-                if destination != "Unknown":
-                    analysis["destination"] = destination
+                print(f"[DEBUG] 🎯 Destination missing - using default: India")
+                analysis["destination"] = "India"
+                print(f"[DEBUG] ✅ Set destination to India (default)")
             
             # Remove resolved missing info from the missing_info list
             # This helps Agent 2 know that the information is now complete
