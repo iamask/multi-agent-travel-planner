@@ -1,12 +1,31 @@
 #!/usr/bin/env python3
 """
-Simple Travel Planner System - Multi-Agent System using Semantic Kernel
+Multi-Agent Travel Planner System using Semantic Kernel
 
-Features:
-- Destination Analyzer Agent: Extracts location, duration, preferences
-- Itinerary Builder Agent: Creates day-wise itineraries
-- Simple feedback loop for clarifications
-- Basic plugins for analysis and itinerary building
+This is a true multi-agent system with two specialized agents:
+
+1. **Agent 1 (Destination Analyzer)**: 
+   - Analyzes user input with LLM
+   - Extracts structured information (destination, duration, purpose)
+   - Returns JSON with missing_info field for Agent 2 to check
+
+2. **Agent 2 (Itinerary Builder)**:
+   - Generates itineraries using structured output from Agent 1
+   - Uses LLM to create destination-specific, dynamic itineraries
+   - Can reach back to Agent 1 if information is missing
+
+**Multi-Agent Coordination Flow:**
+- Agent 1 analyzes user input → returns structured JSON
+- Agent 2 checks structured output → generates itinerary OR requests clarification
+- Agent 1 processes clarification → updates analysis with defaults
+- Agent 2 creates final LLM-generated itinerary
+
+Key Features:
+- LLM-powered analysis with structured output (Agent 1)
+- LLM-powered itinerary generation (Agent 2)
+- Intelligent feedback loop between agents
+- No hallucination - proper coordination for missing info
+- Type-safe communication with Pydantic models
 """
 
 import os
@@ -23,8 +42,20 @@ from semantic_kernel.kernel_pydantic import KernelBaseModel
 from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
 
 # Pydantic models for structured output
+# This ensures type-safe JSON responses from the LLM
 class TravelAnalysis(KernelBaseModel):
-    """Structured output for travel request analysis."""
+    """
+    Structured output for travel request analysis.
+    
+    This Pydantic model defines the exact structure that the LLM must return,
+    ensuring type safety and preventing malformed responses.
+    
+    Fields:
+        destination (str): Where the user wants to travel (or "Unknown" if not found)
+        duration (str | None): How long the trip should be (or None if not found)
+        purpose (str): Why they're traveling (e.g., "vacation", "business")
+        missing_info (List[str]): List of missing information items for Agent 2 to check
+    """
     destination: str
     duration: str | None
     purpose: str
@@ -32,15 +63,28 @@ class TravelAnalysis(KernelBaseModel):
 
 class DestinationAnalyzerPlugin:
     """
-    Plugin for analyzing travel requests and extracting structured information.
+    Plugin for Agent 1: Destination Analyzer
     
-    This plugin provides two main functions:
-    1. analyze_travel_request: Extracts destination, duration, and purpose from natural language
-    2. handle_clarification: Processes clarification requests and updates analysis
+    This plugin provides the core functionality for Agent 1 in the multi-agent system:
+    1. analyze_travel_request: Analyzes user input with LLM and extracts structured information
+    2. handle_clarification: Processes clarification requests from Agent 2 when information is missing
+    
+    **Agent 1's Role in Multi-Agent System:**
+    - Analyzes user input with LLM
+    - Extracts destination, duration, and purpose from natural language
+    - Returns structured JSON with missing_info field for Agent 2 to check
+    - Processes clarification requests from Agent 2 when information is missing
+    
+    Key Features:
+    - LLM-powered analysis with structured output using Pydantic models
+    - Type-safe JSON responses with guaranteed structure
+    - Proper agent coordination (only processes clarifications when Agent 2 asks)
+    - Simple default processing for missing information
     """
     
     def __init__(self):
-        # Initialize kernel for this plugin (though not used directly in this implementation)
+        # Initialize kernel for this plugin
+        # The kernel provides access to LLM services and manages plugin registration
         self.kernel = Kernel()
     
     @kernel_function(
@@ -66,9 +110,13 @@ class DestinationAnalyzerPlugin:
         print(f"[DEBUG] 🔍 Agent 1: This function should ONLY analyze, NOT call handle_clarification")
         
         # Create LLM service for analysis
+        # This is the only place where we use LLM in this plugin
+        # The LLM will extract structured information from natural language
         llm_service = OpenAIChatCompletion(ai_model_id="gpt-4o-mini")
         
         # Craft a detailed prompt for LLM extraction
+        # This prompt instructs the LLM to extract structured information and return valid JSON
+        # The LLM will analyze natural language and identify destination, duration, and purpose
         prompt = f"""
         Analyze this travel request and extract key information: "{user_request}"
         
@@ -93,13 +141,14 @@ class DestinationAnalyzerPlugin:
         
         try:
             # Create settings for the LLM request with structured output
+            # These settings ensure the LLM returns structured, consistent responses
             from semantic_kernel.connectors.ai.open_ai import OpenAIPromptExecutionSettings
             
             settings = OpenAIPromptExecutionSettings(
-                max_tokens=200,
-                temperature=0.1,  # Low temperature for more consistent output
+                max_tokens=200,  # Limit response length for efficiency
+                temperature=0.1,  # Low temperature for more consistent, deterministic output
                 function_choice_behavior=FunctionChoiceBehavior.Auto(),
-                response_format=TravelAnalysis  # Use Pydantic model for structured output
+                response_format=TravelAnalysis  # Use Pydantic model for guaranteed structured output
             )
             
             # Get LLM response using the correct method
@@ -112,6 +161,7 @@ class DestinationAnalyzerPlugin:
             analysis = json.loads(llm_result)
             
             # Calculate missing info based on what we have
+            # This helps Agent 2 know what information is missing and needs clarification
             missing_info = []
             if not analysis.get("duration"):
                 missing_info.append("duration")
@@ -128,6 +178,7 @@ class DestinationAnalyzerPlugin:
             print(f"[DEBUG] ❌ Agent 1: Destination Analyzer failed to process request")
             
             # Return error when LLM fails - no fallback
+            # This ensures Agent 2 knows that Agent 1 failed and can handle the error
             return json.dumps({
                 "destination": "Unknown",
                 "duration": None,
@@ -147,15 +198,14 @@ class DestinationAnalyzerPlugin:
         Update analysis based on user clarification.
         
         This function processes clarification requests from Agent 2 and updates
-        the analysis with the provided information. It uses enhanced regex-based
-        extraction for more accurate processing.
+        the analysis with simple default values for missing information.
         
         Args:
             original_analysis (str): JSON string of the original analysis
-            user_clarification (str): User's clarification input
+            user_clarification (str): User's clarification input (not used in current implementation)
             
         Returns:
-            str: Updated JSON analysis with resolved missing information
+            str: Updated JSON analysis with resolved missing information using defaults
         """
         print(f"[DEBUG] 🔄 Agent 1: Destination Analyzer (GPT-4o-mini) Plugin: handle_clarification called")
         print(f"[DEBUG] 📥 Original analysis: {original_analysis}")
@@ -163,26 +213,30 @@ class DestinationAnalyzerPlugin:
         print(f"[DEBUG] 🔍 This should only be called when Agent 2 requests clarification")
         
         try:
-            # Parse the original analysis JSON
+            # Parse the original analysis JSON from Agent 1's initial analysis
+            # This contains the missing_info that Agent 2 detected
             analysis = json.loads(original_analysis)
             clarification_lower = user_clarification.lower()
             
             print(f"[DEBUG] 🔍 Processing clarification: {clarification_lower}")
             
             # Update duration if it was missing - use simple default
+            # This is the only place where we set default values for missing information
             if "duration" in analysis.get("missing_info", []):
                 print(f"[DEBUG] ⏰ Duration missing - using default: 7 days")
-                analysis["duration"] = "7 days"
+                analysis["duration"] = "7 days"  # Simple default, no complex extraction
                 print(f"[DEBUG] ✅ Set duration to 7 days (default)")
             
             # Update destination if it was missing - use simple default
+            # This ensures we always have a destination, even if user didn't specify one
             if "destination" in analysis.get("missing_info", []):
                 print(f"[DEBUG] 🎯 Destination missing - using default: India")
-                analysis["destination"] = "India"
+                analysis["destination"] = "India"  # Simple default, no complex extraction
                 print(f"[DEBUG] ✅ Set destination to India (default)")
             
             # Remove resolved missing info from the missing_info list
             # This helps Agent 2 know that the information is now complete
+            # Agent 2 will only create an itinerary when missing_info is empty
             resolved_items = []
             for item in analysis.get("missing_info", []):
                 if item == "duration" and analysis.get("duration"):
@@ -193,6 +247,7 @@ class DestinationAnalyzerPlugin:
                     print(f"[DEBUG] ✅ Resolved destination")
             
             # Remove resolved items from missing_info list
+            # This is crucial for Agent 2 to know that all info is now available
             for item in resolved_items:
                 analysis["missing_info"].remove(item)
             
@@ -205,21 +260,37 @@ class DestinationAnalyzerPlugin:
 
 class ItineraryBuilderPlugin:
     """
-    Plugin for building travel itineraries based on analyzed travel information.
+    Plugin for Agent 2: Itinerary Builder
     
-    This plugin provides the main build_itinerary function and several helper
-    methods for generating specialized and general itineraries.
+    This plugin provides the core functionality for Agent 2 in the multi-agent system:
+    - build_itinerary: Generates itineraries using structured output from Agent 1
+    - _request_clarification: Requests clarification from Agent 1 when information is missing
+    - _generate_general_itinerary: Uses LLM to create destination-specific itineraries
+    
+    **Agent 2's Role in Multi-Agent System:**
+    - Generates itineraries using structured output from Agent 1
+    - Uses LLM to create destination-specific, dynamic itineraries
+    - Can reach back to Agent 1 if information is missing
+    - Only creates itineraries when all required information is complete
+    
+    Key Features:
+    - LLM-powered itinerary generation for dynamic, destination-specific content
+    - Checks for missing information from Agent 1's analysis
+    - Requests clarification from Agent 1 when info is missing
+    - Proper agent coordination (detects missing info, requests clarification)
+    - Type-safe communication using structured JSON from Agent 1
     """
     
     def __init__(self):
-        # Initialize kernel for this plugin (though not used directly in this implementation)
+        # Initialize kernel for this plugin
+        # The kernel provides access to LLM services and manages plugin registration
         self.kernel = Kernel()
     
     @kernel_function(
         description="Build travel itinerary based on analysis",
         name="build_itinerary"
     )
-    def build_itinerary(self, analysis: str) -> str:
+    async def build_itinerary(self, analysis: str) -> str:
         """
         Build a simple travel itinerary based on the provided analysis.
         
@@ -238,33 +309,40 @@ class ItineraryBuilderPlugin:
         
         try:
             # Parse the analysis JSON from Agent 1
+            # This contains the structured analysis with destination, duration, purpose, and missing_info
             data = json.loads(analysis)
             
-            # Check if Agent 1 failed
+            # Check if Agent 1 failed during analysis
+            # This handles cases where the LLM couldn't parse the request properly
             if "error" in data:
                 print(f"[DEBUG] ❌ Agent 2: Itinerary Builder (GPT-4o-mini): Agent 1 failed: {data.get('error')}")
                 return f"❌ Travel planning failed: {data.get('error')}. Please try again."
             
+            # Extract travel information from Agent 1's analysis
+            # These fields are guaranteed to exist due to the Pydantic model structure
             destination = data.get("destination", "Unknown")
             duration = data.get("duration", "7 days")
             purpose = data.get("purpose", "General Travel")
-            missing_info = data.get("missing_info", [])
+            missing_info = data.get("missing_info", [])  # This is the key field for coordination
             
             print(f"[DEBUG] 🎯 Agent 2: Itinerary Builder (GPT-4o-mini): Destination={destination}, Duration={duration}, Purpose={purpose}")
             
             # If missing info, request clarification from Agent 1
-            # This ensures we have complete information before creating an itinerary
+            # This is the key coordination point - Agent 2 detects missing info and requests clarification
+            # Agent 2 will only create an itinerary when all information is complete
             if missing_info:
                 print(f"[DEBUG] ❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing info detected: {missing_info}")
                 print(f"[DEBUG] ❓ Agent 2: Itinerary Builder (GPT-4o-mini): Asking Agent 1 for clarification")
                 print(f"[DEBUG] 🔄 Agent 2: This is the CORRECT flow - Agent 2 requesting clarification from Agent 1")
                 return self._request_clarification(missing_info)
             
-            # Generate simple itinerary based on available information
-            print(f"[DEBUG] 📝 Agent 2: Itinerary Builder (GPT-4o-mini): All info complete, creating itinerary")
-            # Use general itinerary template for any destination
-            print(f"[DEBUG] 🎯 Agent 2: Itinerary Builder (GPT-4o-mini): Creating general itinerary for {destination}")
-            return self._generate_general_itinerary(destination, duration, purpose)
+            # Generate LLM-powered itinerary based on available information
+            # This only happens when all required information is complete (missing_info is empty)
+            print(f"[DEBUG] 📝 Agent 2: Itinerary Builder (GPT-4o-mini): All info complete, creating LLM-generated itinerary")
+            # Use LLM to generate dynamic, destination-specific itinerary
+            # The itinerary will be unique for each destination, duration, and purpose
+            print(f"[DEBUG] 🎯 Agent 2: Itinerary Builder (GPT-4o-mini): Creating LLM-generated itinerary for {destination}")
+            return await self._generate_general_itinerary(destination, duration, purpose)
                 
         except json.JSONDecodeError as e:
             print(f"[DEBUG] ❌ Error parsing analysis: {e}")
@@ -275,18 +353,20 @@ class ItineraryBuilderPlugin:
         Request clarification for missing information.
         
         This function creates a structured clarification request that Agent 1
-        can process to get the missing information.
+        can process to get the missing information. This is the key function
+        that enables Agent 2 to communicate with Agent 1 for missing info.
         
         Args:
-            missing_info (List[str]): List of missing information items
+            missing_info (List[str]): List of missing information items from Agent 1's analysis
             
         Returns:
-            str: JSON string containing clarification request
+            str: JSON string containing clarification request for Agent 1 to process
         """
         print(f"[DEBUG] ❓ Agent 2: Itinerary Builder (GPT-4o-mini) Plugin: _request_clarification called")
         print(f"[DEBUG] 📋 Missing info: {missing_info}")
         
         # Create specific questions for each missing piece of information
+        # These questions help Agent 1 understand what information is needed
         questions = []
         
         if "duration" in missing_info:
@@ -298,6 +378,7 @@ class ItineraryBuilderPlugin:
         
         # Create structured clarification request
         # This format allows Agent 1 to understand what information is needed
+        # Agent 1 will use this to determine which defaults to apply
         result = {
             "needs_clarification": True,
             "questions": questions,
@@ -309,12 +390,12 @@ class ItineraryBuilderPlugin:
     
 
     
-    def _generate_general_itinerary(self, destination: str, duration: str, purpose: str) -> str:
+    async def _generate_general_itinerary(self, destination: str, duration: str, purpose: str) -> str:
         """
-        Generate a general travel itinerary.
+        Generate LLM-powered travel itinerary.
         
-        This template provides a flexible framework for any destination,
-        with practical advice and structure that can be customized.
+        This function uses LLM to create dynamic, destination-specific itineraries
+        based on the destination, duration, and purpose of travel.
         
         Args:
             destination (str): Travel destination
@@ -322,97 +403,107 @@ class ItineraryBuilderPlugin:
             purpose (str): Purpose of travel (e.g., "General Travel")
             
         Returns:
-            str: General travel itinerary template
+            str: LLM-generated travel itinerary
         """
-        # Extract number of days for dynamic day planning
-        days = 7  # Default
-        if duration:
-            import re
-            day_match = re.search(r'(\d+)', duration)
-            if day_match:
-                days = int(day_match.group(1))
+        print(f"[DEBUG] 🤖 Agent 2: Using LLM to generate itinerary for {destination}")
         
-        # Generate dynamic day structure
-        day_activities = ""
-        for day in range(2, days):
-            day_activities += f"### Day {day}: Exploration\n"
-            day_activities += "- Sightseeing and activities\n"
-            day_activities += "- Local cuisine experiences\n"
-            day_activities += "- Cultural activities\n"
-            day_activities += "- Shopping and exploration\n\n"
+        # Create LLM service for itinerary generation
+        llm_service = OpenAIChatCompletion(ai_model_id="gpt-4o-mini")
         
-        return f"""
-# Travel Itinerary: {destination} ({duration})
-
-## Trip Overview
-Experience {destination} with this {duration} itinerary for {purpose.lower()} travel.
-
-## Day-by-Day Itinerary
-
-### Day 1: Arrival
-- Arrive at {destination}
-- Check into hotel
-- Light exploration of the area
-- Welcome dinner
-
-{day_activities}### Day {days}: Departure
-- Final activities
-- Souvenir shopping
-- Departure
-
-## Accommodation
-- Research hotels in the city center of {destination}
-- Book in advance for better rates
-- Consider your budget and preferences
-
-## Transportation
-- Research local transportation options in {destination}
-- Consider city passes for attractions
-- Plan airport transfers
-
-## Budget Tips
-- Research accommodation rates in {destination}
-- Plan for local cuisine experiences
-- Include must-see attractions
-- Factor in transportation costs
-
-## Travel Tips for {destination}
-- Research local customs and culture
-- Learn basic phrases in the local language
-- Check visa requirements if needed
-- Pack according to the local climate
-
-*This is a general framework - customize based on your specific destination and preferences.*
-        """.strip()
+        # Craft a detailed prompt for LLM itinerary generation
+        prompt = f"""
+        Create a detailed {duration} travel itinerary for {destination} for {purpose.lower()} travel.
+        
+        The itinerary should include:
+        
+        ## Trip Overview
+        - Brief introduction about the destination and trip purpose
+        
+        ## Day-by-Day Itinerary
+        - Day 1: Arrival and initial exploration
+        - Day 2-6: Daily activities, sightseeing, cultural experiences
+        - Final day: Departure activities
+        
+        ## Accommodation
+        - Recommendations for where to stay in {destination}
+        - Booking tips and considerations
+        
+        ## Transportation
+        - How to get around in {destination}
+        - Airport transfers and local transport options
+        
+        ## Travel Tips
+        - Local customs and culture
+        - Language considerations
+        - Visa requirements if needed
+        - Weather and packing tips
+        
+        Make the itinerary specific to {destination} and {purpose.lower()} travel.
+        Include realistic activities, local attractions, and cultural experiences.
+        Format it nicely with clear sections and bullet points.
+        """
+        
+        try:
+            # Create settings for the LLM request
+            from semantic_kernel.connectors.ai.open_ai import OpenAIPromptExecutionSettings
+            
+            settings = OpenAIPromptExecutionSettings(
+                max_tokens=1000,  # More tokens for detailed itineraries
+                temperature=0.7,  # Slightly higher for creative content
+                function_choice_behavior=FunctionChoiceBehavior.Auto()
+            )
+            
+            # Get LLM response for itinerary generation
+            response = await llm_service.get_text_content(prompt, settings)
+            itinerary = response.text.strip()
+            
+            print(f"[DEBUG] ✅ Agent 2: LLM generated itinerary successfully")
+            return itinerary
+            
+        except Exception as e:
+            print(f"[DEBUG] ❌ Agent 2: LLM itinerary generation failed: {e}")
+            # Simple fallback if LLM fails
+            return f"# Travel Itinerary: {destination} ({duration})\n\nPlan your {duration} trip to {destination} for {purpose.lower()} travel.\n\n*LLM generation failed - please try again.*"
 
 def get_travel_agents():
     """
-    Create simple travel planning agents with kernel and plugins.
+    Create multi-agent travel planning system with two specialized agents.
     
-    This function sets up the multi-agent system by:
-    1. Creating a kernel and adding plugins
-    2. Creating two specialized agents with specific roles
+    This function sets up the true multi-agent system by:
+    1. Creating a kernel and adding plugins for Agent 1 (analyzer) and Agent 2 (itinerary builder)
+    2. Creating two specialized agents with clear roles in the multi-agent coordination
     3. Configuring agents with proper instructions and kernel integration
+    4. Ensuring proper multi-agent coordination (Agent 2 can reach back to Agent 1)
+    
+    **Multi-Agent Architecture:**
+    - Agent 1: Analyzes user input with LLM → returns structured JSON
+    - Agent 2: Generates itineraries using structured output from Agent 1
+    - Agent 2 can reach back to Agent 1 if information is missing
     
     Returns:
-        List[ChatCompletionAgent]: List of configured agents for the travel planner
+        List[ChatCompletionAgent]: List of configured agents for the multi-agent travel planner
     """
     # Create kernel and add plugins
     # The kernel manages the plugins and provides them to agents
+    # This is the central hub that connects agents with their functionality
     kernel = Kernel()
     
     # Add plugins to kernel
     # These plugins provide the core functionality for travel analysis and itinerary building
+    # Each plugin contains kernel functions that agents can call
     destination_analyzer_plugin = DestinationAnalyzerPlugin()
     itinerary_builder_plugin = ItineraryBuilderPlugin()
     
     # Register plugins with the kernel using descriptive names
-    # This allows agents to access plugin functions
+    # This allows agents to access plugin functions through the kernel
+    # Agents will call functions like "DestinationAnalyzer.analyze_travel_request"
     kernel.add_plugin(destination_analyzer_plugin, "DestinationAnalyzer")
     kernel.add_plugin(itinerary_builder_plugin, "ItineraryBuilder")
     
     return [
-        # Agent 1: Destination Analyzer - Extracts travel information from user requests
+        # Agent 1: Destination Analyzer - Analyzes user input with LLM
+        # This agent is the first in the multi-agent system
+        # It analyzes user input and returns structured JSON for Agent 2 to use
         ChatCompletionAgent(
             name="Agent1_DestinationAnalyzer",
             description="Agent 1: Destination Analyzer (GPT-4o-mini)",
@@ -442,12 +533,17 @@ def get_travel_agents():
 **CRITICAL: Do NOT call handle_clarification directly. Only Agent 2 should request clarifications.**
 
 Keep your analysis simple and focused on the essential travel planning elements.""",
+            # AGENT-LEVEL INSTRUCTIONS: Define the agent's permanent behavior and capabilities
+            # These instructions are part of the agent's identity and don't change between tasks
+            # They define what this agent can do and how it should behave in general
             service=OpenAIChatCompletion(
                 ai_model_id="gpt-4o-mini"
             ),
             kernel=kernel,  # Connect agent to kernel for plugin access
         ),
-        # Agent 2: Itinerary Builder - Creates travel itineraries based on Agent 1's analysis
+        # Agent 2: Itinerary Builder - Generates itineraries using structured output from Agent 1
+        # This agent is the second in the multi-agent system
+        # It can reach back to Agent 1 if information is missing
         ChatCompletionAgent(
             name="Agent2_ItineraryBuilder", 
             description="Agent 2: Itinerary Builder (GPT-4o-mini)",
@@ -473,6 +569,9 @@ Keep your analysis simple and focused on the essential travel planning elements.
 - Local experiences and cultural activities
 
 **CRITICAL: Return only the itinerary content, no additional text or explanations.**""",
+            # AGENT-LEVEL INSTRUCTIONS: Define the agent's permanent behavior and capabilities
+            # These instructions are part of the agent's identity and don't change between tasks
+            # They define what this agent can do and how it should behave in general
             service=OpenAIChatCompletion(
                 ai_model_id="gpt-4o-mini"
             ),
@@ -482,30 +581,38 @@ Keep your analysis simple and focused on the essential travel planning elements.
 
 async def run_simple_travel_planner(user_request: str):
     """
-    Run the simple travel planner with proper feedback loop.
+    Run the multi-agent travel planner system.
     
-    This function orchestrates the multi-agent travel planning process:
-    1. Creates agents with kernel and plugins
-    2. Sets up group chat for agent collaboration
-    3. Sends the user request to the agent group
-    4. Returns the final travel itinerary
+    This function orchestrates the true multi-agent system with two specialized agents:
+    1. Creates agents with kernel and plugins for multi-agent coordination
+    2. Sets up group chat for agent collaboration with proper feedback loop
+    3. Sends the user request to the multi-agent group for processing
+    4. Returns the final LLM-generated travel itinerary or error message
+    
+    **Multi-Agent Coordination Flow:**
+    - Agent 1 analyzes user input with LLM → returns structured JSON
+    - Agent 2 checks structured output → generates itinerary OR requests clarification
+    - Agent 1 processes clarification → updates analysis with defaults
+    - Agent 2 creates final LLM-generated itinerary
     
     Args:
         user_request (str): Natural language travel request from user
         
     Returns:
-        str: Final travel itinerary or None if failed
+        str: Final LLM-generated travel itinerary or None if failed
     """
     print(f"✈️ Travel Request: {user_request}")
     print("🤖 Initializing Simple Travel Planner...")
     
     # Create agents with kernel and plugins
     # These agents will collaborate to analyze the request and create an itinerary
+    # Agent 1 will analyze, Agent 2 will detect missing info and request clarification
     agents = get_travel_agents()
     print(f"[DEBUG] 🤖 Created {len(agents)} agents: {[agent.name for agent in agents]}")
     
     # Create group chat for agent collaboration
     # RoundRobinGroupChatManager ensures agents take turns in the conversation
+    # This enables the feedback loop where Agent 2 can request clarification from Agent 1
     group_chat = GroupChatOrchestration(
         members=agents,
         manager=RoundRobinGroupChatManager(max_rounds=5),  # Increased for feedback loops
@@ -514,6 +621,7 @@ async def run_simple_travel_planner(user_request: str):
     
     # Initialize runtime for agent execution
     # This manages the execution environment for the agents
+    # The runtime handles the actual execution of agent conversations
     runtime = InProcessRuntime()
     runtime.start()
     print(f"[DEBUG] ⚡ Runtime started")
@@ -571,6 +679,9 @@ async def run_simple_travel_planner(user_request: str):
 **CRITICAL: Agent 2 must return the actual itinerary content, not just a message saying the itinerary is ready.**
 
 Keep it simple and practical!""",
+            # TASK-LEVEL INSTRUCTIONS: Define the specific coordination flow for this particular task
+            # These instructions are specific to the travel planning task and define how agents should coordinate
+            # They override or supplement the agent-level instructions for this specific task
             runtime=runtime,
         )
         
