@@ -99,22 +99,21 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[User Request] --> B[Agent 1: Destination Analyzer<br/>GPT-4o-mini]
-    B --> C{Missing Info?}
-    C -->|No| D[Agent 2: Itinerary Builder<br/>GPT-4o-mini]
-    C -->|Yes| E[Agent 2 asks Agent 1]
-    E --> F[Agent 1 checks original request]
-    F --> G{Info in original request?}
-    G -->|No| H[Agent 1 asks User directly]
-    G -->|Yes| I[Agent 1 updates analysis]
-    H --> J[User provides clarification]
-    J --> I
-    I --> D
-    D --> K[Final Travel Itinerary]
+    B --> C[Analyze request & return analysis]
+    C --> D{Missing Info?}
+    D -->|No| E[Agent 2: Itinerary Builder<br/>GPT-4o-mini]
+    D -->|Yes| F[Agent 2 requests clarification from Agent 1]
+    F --> G[Agent 1: handle_clarification]
+    G --> H[Process clarification request]
+    H --> I[Update analysis with clarification]
+    I --> E
+    E --> J[Create final itinerary]
+    J --> K[Final Travel Itinerary]
 
     style A fill:#e1f5fe
     style B fill:#f3e5f5
-    style D fill:#f3e5f5
-    style H fill:#fff3e0
+    style E fill:#f3e5f5
+    style G fill:#e8f5e8
     style K fill:#e8f5e8
 ```
 
@@ -300,7 +299,7 @@ This project demonstrates key **Semantic Kernel** concepts:
 ### **3. Intelligent Feedback Loops**
 
 - Agent 2 asks Agent 1 for missing information
-- Agent 1 asks user directly (no hallucination)
+- Agent 1 processes clarification requests using `handle_clarification` function
 - Complete information validation before itinerary creation
 
 ### **4. Real-World Application**

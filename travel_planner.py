@@ -421,7 +421,7 @@ def get_travel_agents():
 
 1. **Use the analyze_travel_request function** to extract destination, duration, and purpose from travel requests
 2. **Use the handle_clarification function** when Agent 2 asks for missing information
-3. **DO NOT hallucinate** - if information is missing, ask the user directly
+3. **DO NOT hallucinate** - if information is missing, indicate it in the missing_info field
 4. **Provide structured JSON output** for Agent 2 to process
 
 **IMPORTANT: You MUST use the available functions:**
@@ -430,7 +430,7 @@ def get_travel_agents():
 
 **Debug Messages**:
 - Start with: "🔍 Agent 1: Destination Analyzer (GPT-4o-mini): Extracted [destination, duration, purpose]"
-- If asked for clarification: "🤔 Agent 1: Destination Analyzer (GPT-4o-mini): Cannot find [missing_info] in original request, asking user"
+- If asked for clarification: "🔄 Agent 1: Destination Analyzer (GPT-4o-mini): Processing clarification request from Agent 2"
 - After user clarification: "✅ Agent 1: Destination Analyzer (GPT-4o-mini): Updated analysis with user clarification"
 
 **Focus on**:
@@ -457,7 +457,7 @@ Keep your analysis simple and focused on the essential travel planning elements.
 - Use `build_itinerary` to process Agent 1's analysis and create itineraries
 
 **Debug Messages**:
-- If missing info: "❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing [missing_info], asking Agent 1"
+- If missing info: "❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing [missing_info], requesting clarification from Agent 1"
 - When creating itinerary: "📝 Agent 2: Itinerary Builder (GPT-4o-mini): Creating itinerary with complete information"
 
 **Focus on**:
@@ -501,35 +501,37 @@ async def run_simple_travel_planner(user_request: str):
         result = await group_chat.invoke(
             task=f"""Please help me plan a trip: "{user_request}"
 
-**IMPORTANT: Use the available functions and handle user input properly**
+**IMPORTANT: Use the available functions and follow the proper feedback loop**
 
 **Step-by-Step Process**:
 1. **Agent 1: Destination Analyzer (GPT-4o-mini)**: Use `analyze_travel_request` function to extract destination, duration, and purpose
 2. **Agent 2: Itinerary Builder (GPT-4o-mini)**: Use `build_itinerary` function to check if information is missing
 3. **If missing info**: Agent 2 will ask Agent 1 for clarification
-4. **Agent 1**: If Agent 2 asks for missing info, use `handle_clarification` function to process user input
+4. **Agent 1**: If Agent 2 asks for missing info, use `handle_clarification` function to process the clarification
 5. **Agent 2**: Create the final itinerary only when all info is complete
 
 **CRITICAL: Use the available functions:**
 - Agent 1: Use `analyze_travel_request` and `handle_clarification` functions
 - Agent 2: Use `build_itinerary` function
 
-**IMPORTANT: Handle User Input Properly:**
-- When user provides clarification (like "7 days"), Agent 1 should use `handle_clarification` function
-- The `handle_clarification` function will update the analysis with the user's input
-- After updating, Agent 2 should create the final itinerary
+**Proper Feedback Loop**:
+- Agent 1 analyzes the request and returns analysis with missing_info if any
+- Agent 2 checks the analysis and requests clarification from Agent 1 if info is missing
+- Agent 1 processes the clarification request using `handle_clarification` function
+- Agent 2 creates the final itinerary when all information is complete
 
 **Debug Messages to Show**:
 - "🔍 Agent 1: Destination Analyzer (GPT-4o-mini): Extracted [destination, duration, purpose]"
-- "❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing [missing_info], asking Agent 1"
-- "🤔 Agent 1: Destination Analyzer (GPT-4o-mini): Cannot find [missing_info] in original request, asking user"
+- "❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing [missing_info], requesting clarification from Agent 1"
+- "🔄 Agent 1: Destination Analyzer (GPT-4o-mini): Processing clarification request from Agent 2"
 - "✅ Agent 1: Destination Analyzer (GPT-4o-mini): Updated analysis with user clarification"
 - "📝 Agent 2: Itinerary Builder (GPT-4o-mini): Creating itinerary with complete information"
 
 **Key Rules**:
 - Agent 1 should NOT hallucinate missing information
-- If information is missing, Agent 1 should ask the user directly
-- When user provides clarification, Agent 1 should use `handle_clarification` function
+- Agent 1 should indicate missing info in the missing_info field
+- Agent 2 should request clarification from Agent 1 when info is missing
+- Agent 1 should use `handle_clarification` function to process clarification requests
 - Only proceed with itinerary creation when all required information is available
 - Show debug messages for each step
 
