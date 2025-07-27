@@ -45,53 +45,34 @@ python travel_planner.py
 ```mermaid
 flowchart TD
     A[User Input] --> B[Interactive Session]
-    B --> C[run_simple_travel_planner]
-    C --> D[Create Kernel & Plugins]
-    D --> E[DestinationAnalyzerPlugin]
-    D --> F[ItineraryBuilderPlugin]
-    C --> G[Create Agents with Kernel]
-    G --> H[Agent 1: Destination Analyzer<br/>GPT-4o-mini]
-    G --> I[Agent 2: Itinerary Builder<br/>GPT-4o-mini]
-    C --> J[GroupChatOrchestration]
-    J --> K[RoundRobinGroupChatManager]
+    B --> C[Create Agents & Plugins]
+    C --> D[Agent 1: Destination Analyzer<br/>GPT-4o-mini]
+    C --> E[Agent 2: Itinerary Builder<br/>GPT-4o-mini]
 
-    %% Agent 1 Components
-    H --> L[Agent 1: analyze_travel_request]
-    L --> M[Extract destination, duration, purpose]
-    M --> N[Return JSON analysis]
-    N --> O{Missing info?}
-    O -->|Yes| P[Agent 2 requests clarification]
-    O -->|No| Q[Agent 2 processes complete analysis]
+    D --> F[analyze_travel_request]
+    F --> G[Extract travel details]
+    G --> H[Return JSON analysis]
 
-    %% Agent 2 Components
-    I --> R[Agent 2: build_itinerary]
-    R --> S[Check analysis completeness]
-    S --> T{Missing info?}
-    T -->|Yes| U[Request clarification from Agent 1]
-    T -->|No| V[Generate itinerary]
+    E --> I[build_itinerary]
+    I --> J{Missing info?}
+    J -->|Yes| K[Request clarification]
+    J -->|No| L[Generate itinerary]
 
-    %% Feedback Loop
-    P --> W[Agent 1: handle_clarification]
-    U --> W
-    W --> X[Use default values for missing info]
-    X --> Y[Update analysis with defaults]
-    Y --> Z[Remove resolved missing_info]
-    Z --> AA[Agent 2: build_itinerary]
-    AA --> BB[Generate final itinerary]
+    K --> M[handle_clarification]
+    M --> N[Use defaults & update]
+    N --> I
 
-    Q --> V
-    V --> CC[Final Travel Itinerary]
+    H --> I
+    L --> O[Final Travel Itinerary]
 
     %% Styling
     style A fill:#e1f5fe
-    style H fill:#f3e5f5
-    style I fill:#f3e5f5
-    style E fill:#fff3e0
-    style F fill:#fff3e0
-    style L fill:#e8f5e8
-    style R fill:#e8f5e8
-    style W fill:#e8f5e8
-    style CC fill:#e8f5e8
+    style D fill:#f3e5f5
+    style E fill:#f3e5f5
+    style F fill:#e8f5e8
+    style I fill:#e8f5e8
+    style M fill:#e8f5e8
+    style O fill:#e8f5e8
 ```
 
 ### **Current System Flow:**
