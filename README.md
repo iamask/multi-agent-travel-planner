@@ -73,8 +73,8 @@ flowchart TD
     %% Feedback Loop
     P --> W[Agent 1: handle_clarification]
     U --> W
-    W --> X[Process user clarification]
-    X --> Y[Update analysis with user input]
+    W --> X[Use default values for missing info]
+    X --> Y[Update analysis with defaults]
     Y --> Z[Remove resolved missing_info]
     Z --> AA[Agent 2: build_itinerary]
     AA --> BB[Generate final itinerary]
