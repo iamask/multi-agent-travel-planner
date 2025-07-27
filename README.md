@@ -52,7 +52,7 @@ flowchart TD
     %% Agent 1 Flow
     D --> F[analyze_travel_request function]
     F --> G[Extract destination, duration, purpose]
-    G --> H[Return JSON analysis<br/>missing_info optional]
+    G --> H[Return JSON analysis]
 
     %% Agent 2 Flow
     E --> I[build_itinerary function]
