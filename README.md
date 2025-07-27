@@ -94,27 +94,33 @@ flowchart TD
     style CC fill:#e8f5e8
 ```
 
-### **Intelligent Feedback Loop System:**
+### **Current System Flow:**
 
 ```mermaid
 flowchart TD
     A[User Request] --> B[Agent 1: Destination Analyzer<br/>GPT-4o-mini]
-    B --> C[Analyze request & return analysis]
-    C --> D{Missing Info?}
-    D -->|No| E[Agent 2: Itinerary Builder<br/>GPT-4o-mini]
-    D -->|Yes| F[Agent 2 requests clarification from Agent 1]
-    F --> G[Agent 1: handle_clarification]
-    G --> H[Process clarification request]
-    H --> I[Update analysis with clarification]
-    I --> E
-    E --> J[Create final itinerary]
-    J --> K[Final Travel Itinerary]
+    B --> C[analyze_travel_request function]
+    C --> D[Extract destination, duration, purpose]
+    D --> E[Return JSON with missing_info]
+    E --> F{Missing Info?}
+    F -->|No| G[Agent 2: Itinerary Builder<br/>GPT-4o-mini]
+    F -->|Yes| H[Agent 2: build_itinerary function]
+    H --> I[Request clarification from Agent 1]
+    I --> J[Agent 1: handle_clarification function]
+    J --> K[Use default values for missing info]
+    K --> L[Update analysis with defaults]
+    L --> M[Remove resolved missing_info]
+    M --> G
+    G --> N[Create final itinerary]
+    N --> O[Final Travel Itinerary]
 
     style A fill:#e1f5fe
     style B fill:#f3e5f5
-    style E fill:#f3e5f5
-    style G fill:#e8f5e8
-    style K fill:#e8f5e8
+    style G fill:#f3e5f5
+    style C fill:#e8f5e8
+    style H fill:#e8f5e8
+    style J fill:#e8f5e8
+    style O fill:#e8f5e8
 ```
 
 ## 🔌 **Plugin Architecture**
