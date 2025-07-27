@@ -49,13 +49,13 @@ flowchart TD
     C --> D[Agent 1: Destination Analyzer<br/>GPT-4o-mini]
     C --> E[Agent 2: Itinerary Builder<br/>GPT-4o-mini]
 
-    %% Agent 1 Flow
+        %% Agent 1 Flow
     D --> F[analyze_travel_request function]
     F --> G[Extract destination, duration, purpose]
     G --> H[Return JSON analysis]
 
     %% Agent 2 Flow
-    E --> I[build_itinerary function]
+    H --> I[build_itinerary function]
     I --> J{Missing Info?}
     J -->|No| K[Generate itinerary]
     J -->|Yes| L[Request clarification from Agent 1]
@@ -68,7 +68,6 @@ flowchart TD
     P --> I
 
     %% Complete Flow
-    H --> I
     K --> Q[Final Travel Itinerary]
 
     %% Styling
