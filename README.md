@@ -44,26 +44,32 @@ python travel_planner.py
 
 ```mermaid
 flowchart TD
-    A[User Input] --> B[Interactive Session]
+    A[User Request] --> B[Interactive Session]
     B --> C[Create Agents & Plugins]
     C --> D[Agent 1: Destination Analyzer<br/>GPT-4o-mini]
     C --> E[Agent 2: Itinerary Builder<br/>GPT-4o-mini]
 
-    D --> F[analyze_travel_request]
-    F --> G[Extract travel details]
-    G --> H[Return JSON analysis]
+    %% Agent 1 Flow
+    D --> F[analyze_travel_request function]
+    F --> G[Extract destination, duration, purpose]
+    G --> H[Return JSON with missing_info]
 
-    E --> I[build_itinerary]
-    I --> J{Missing info?}
-    J -->|Yes| K[Request clarification]
-    J -->|No| L[Generate itinerary]
+    %% Agent 2 Flow
+    E --> I[build_itinerary function]
+    I --> J{Missing Info?}
+    J -->|No| K[Generate itinerary]
+    J -->|Yes| L[Request clarification from Agent 1]
 
-    K --> M[handle_clarification]
-    M --> N[Use defaults & update]
-    N --> I
+    %% Feedback Loop
+    L --> M[handle_clarification function]
+    M --> N[Use default values for missing info]
+    N --> O[Update analysis with defaults]
+    O --> P[Remove resolved missing_info]
+    P --> I
 
+    %% Complete Flow
     H --> I
-    L --> O[Final Travel Itinerary]
+    K --> Q[Final Travel Itinerary]
 
     %% Styling
     style A fill:#e1f5fe
@@ -72,36 +78,7 @@ flowchart TD
     style F fill:#e8f5e8
     style I fill:#e8f5e8
     style M fill:#e8f5e8
-    style O fill:#e8f5e8
-```
-
-### **Current System Flow:**
-
-```mermaid
-flowchart TD
-    A[User Request] --> B[Agent 1: Destination Analyzer<br/>GPT-4o-mini]
-    B --> C[analyze_travel_request function]
-    C --> D[Extract destination, duration, purpose]
-    D --> E[Return JSON with missing_info]
-    E --> F{Missing Info?}
-    F -->|No| G[Agent 2: Itinerary Builder<br/>GPT-4o-mini]
-    F -->|Yes| H[Agent 2: build_itinerary function]
-    H --> I[Request clarification from Agent 1]
-    I --> J[Agent 1: handle_clarification function]
-    J --> K[Use default values for missing info]
-    K --> L[Update analysis with defaults]
-    L --> M[Remove resolved missing_info]
-    M --> G
-    G --> N[Create final itinerary]
-    N --> O[Final Travel Itinerary]
-
-    style A fill:#e1f5fe
-    style B fill:#f3e5f5
-    style G fill:#f3e5f5
-    style C fill:#e8f5e8
-    style H fill:#e8f5e8
-    style J fill:#e8f5e8
-    style O fill:#e8f5e8
+    style Q fill:#e8f5e8
 ```
 
 ## 🔌 **Plugin Architecture**
