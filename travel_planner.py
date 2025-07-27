@@ -470,8 +470,8 @@ def get_travel_agents():
     Create multi-agent travel planning system with two specialized agents.
     
     This function sets up the true multi-agent system by:
-    1. Creating a kernel and adding plugins for Agent 1 (analyzer) and Agent 2 (itinerary builder)
-    2. Creating two specialized agents with clear roles in the multi-agent coordination
+    1. Creating separate kernels for each agent with only their relevant plugins
+    2. Creating two specialized agents with clear roles and isolated plugin access
     3. Configuring agents with proper instructions and kernel integration
     4. Ensuring proper multi-agent coordination (Agent 2 can reach back to Agent 1)
     
@@ -480,30 +480,32 @@ def get_travel_agents():
     - Agent 2: Generates itineraries using structured output from Agent 1
     - Agent 2 can reach back to Agent 1 if information is missing
     
+    **Best Practice: Separate Kernels per Agent**
+    - Each agent has its own kernel with only its relevant plugins
+    - Prevents tool confusion and memory/context mixing
+    - Enables future features like per-agent embeddings
+    - Ensures clean separation of concerns
+    
     Returns:
         List[ChatCompletionAgent]: List of configured agents for the multi-agent travel planner
     """
-    # Create kernel and add plugins
-    # The kernel manages the plugins and provides them to agents
-    # This is the central hub that connects agents with their functionality
-    kernel = Kernel()
+    # Create separate kernels for each agent
+    # This is the recommended approach for clean, scalable multi-agent systems
+    # Each agent only sees its own plugins, preventing confusion and ensuring isolation
     
-    # Add plugins to kernel
-    # These plugins provide the core functionality for travel analysis and itinerary building
-    # Each plugin contains kernel functions that agents can call
-    destination_analyzer_plugin = DestinationAnalyzerPlugin()
-    itinerary_builder_plugin = ItineraryBuilderPlugin()
+    # Agent 1 kernel with only Destination Analyzer plugin
+    kernel_analyzer = Kernel()
+    kernel_analyzer.add_plugin(DestinationAnalyzerPlugin(), "DestinationAnalyzer")
     
-    # Register plugins with the kernel using descriptive names
-    # This allows agents to access plugin functions through the kernel
-    # Agents will call functions like "DestinationAnalyzer.analyze_travel_request"
-    kernel.add_plugin(destination_analyzer_plugin, "DestinationAnalyzer")
-    kernel.add_plugin(itinerary_builder_plugin, "ItineraryBuilder")
+    # Agent 2 kernel with only Itinerary Builder plugin  
+    kernel_itinerary = Kernel()
+    kernel_itinerary.add_plugin(ItineraryBuilderPlugin(), "ItineraryBuilder")
     
     return [
         # Agent 1: Destination Analyzer - Analyzes user input with LLM
         # This agent is the first in the multi-agent system
         # It analyzes user input and returns structured JSON for Agent 2 to use
+        # Has access ONLY to DestinationAnalyzer plugin functions
         ChatCompletionAgent(
             name="Agent1_DestinationAnalyzer",
             description="Agent 1: Destination Analyzer (GPT-4o-mini)",
@@ -539,11 +541,12 @@ Keep your analysis simple and focused on the essential travel planning elements.
             service=OpenAIChatCompletion(
                 ai_model_id="gpt-4o-mini"
             ),
-            kernel=kernel,  # Connect agent to kernel for plugin access
+            kernel=kernel_analyzer,  # Connect agent to its own kernel with only DestinationAnalyzer plugin
         ),
         # Agent 2: Itinerary Builder - Generates itineraries using structured output from Agent 1
         # This agent is the second in the multi-agent system
         # It can reach back to Agent 1 if information is missing
+        # Has access ONLY to ItineraryBuilder plugin functions
         ChatCompletionAgent(
             name="Agent2_ItineraryBuilder", 
             description="Agent 2: Itinerary Builder (GPT-4o-mini)",
@@ -575,7 +578,7 @@ Keep your analysis simple and focused on the essential travel planning elements.
             service=OpenAIChatCompletion(
                 ai_model_id="gpt-4o-mini"
             ),
-            kernel=kernel,  # Connect agent to kernel for plugin access
+            kernel=kernel_itinerary,  # Connect agent to its own kernel with only ItineraryBuilder plugin
         ),
     ]
 

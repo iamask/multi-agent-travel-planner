@@ -20,20 +20,28 @@ kernel.add_plugin(itinerary_builder_plugin, "ItineraryBuilder")
 ### **Multi-Agent Definition:**
 
 ```python
+# Agent 1 kernel with only Destination Analyzer plugin
+kernel_analyzer = Kernel()
+kernel_analyzer.add_plugin(DestinationAnalyzerPlugin(), "DestinationAnalyzer")
+
+# Agent 2 kernel with only Itinerary Builder plugin
+kernel_itinerary = Kernel()
+kernel_itinerary.add_plugin(ItineraryBuilderPlugin(), "ItineraryBuilder")
+
 agents = [
     ChatCompletionAgent(
         name="Agent1_DestinationAnalyzer",
         description="Agent 1: Destination Analyzer (GPT-4o-mini)",
         instructions="Use analyze_travel_request and handle_clarification functions",
         service=OpenAIChatCompletion(ai_model_id="gpt-4o-mini"),
-        kernel=kernel,  # Connect agent to kernel for plugin access
+        kernel=kernel_analyzer,  # Connect agent to its own kernel
     ),
     ChatCompletionAgent(
         name="Agent2_ItineraryBuilder",
         description="Agent 2: Itinerary Builder (GPT-4o-mini)",
         instructions="Use build_itinerary function and request clarifications",
         service=OpenAIChatCompletion(ai_model_id="gpt-4o-mini"),
-        kernel=kernel,  # Connect agent to kernel for plugin access
+        kernel=kernel_itinerary,  # Connect agent to its own kernel
     ),
 ]
 ```
@@ -46,6 +54,24 @@ group_chat = GroupChatOrchestration(
     manager=RoundRobinGroupChatManager(max_rounds=5),
 )
 ```
+
+### **Why Separate Kernels per Agent?**
+
+✅ **Best Practice**: Each agent has its own kernel with only its relevant plugins
+
+**Benefits:**
+
+- **Tool Isolation**: Agents only see their own plugins, preventing confusion
+- **Memory Separation**: Context and embeddings stay isolated per agent
+- **Scalability**: Easy to add new agents without affecting existing ones
+- **Clean Architecture**: Clear separation of concerns
+- **Future-Proof**: Enables per-agent features like custom embeddings
+
+**Avoid:**
+❌ Sharing a single kernel across all agents
+❌ All agents seeing all plugins
+❌ Potential tool name conflicts
+❌ Mixed memory/context between agents
 
 ## 🔄 **2. Multi-Agent Flow**
 
@@ -248,7 +274,257 @@ Agent2: "All info complete. Creating LLM-generated itinerary for Japan..."
 ✅ **Flexible Coordination** - Different patterns for different tasks
 ✅ **Scalable Architecture** - Easy to add more agents
 
-## 🤖 **4. Agents, Plugins, and Tools**
+## 🤖 **4. How ChatCompletionAgent Prompts Are Analyzed**
+
+### **The 3 Models in Our Multi-Agent System:**
+
+Our system uses **3 different GPT-4o-mini models** for different purposes:
+
+#### **Model 1: Shared Context Mode (Group Chat Manager)**
+
+```python
+# This model manages the overall conversation flow
+group_chat = GroupChatOrchestration(
+    members=agents,
+    manager=RoundRobinGroupChatManager(max_rounds=5),  # Uses GPT-4o-mini internally
+)
+```
+
+**Purpose:**
+
+- **Orchestrates** which agent speaks when
+- **Manages** turn-taking and conversation flow
+- **Decides** when to stop the conversation
+- **Coordinates** between agents
+
+#### **Model 2: Agent 1 - Destination Analyzer**
+
+```python
+ChatCompletionAgent(
+    name="Agent1_DestinationAnalyzer",
+    service=OpenAIChatCompletion(ai_model_id="gpt-4o-mini"),  # Model 2
+    instructions="Use analyze_travel_request and handle_clarification functions",
+    kernel=kernel_analyzer,
+)
+```
+
+**Purpose:**
+
+- **Analyzes** user travel requests
+- **Extracts** structured information (destination, duration, purpose)
+- **Processes** clarification requests from Agent 2
+- **Returns** JSON with missing_info field
+
+#### **Model 3: Agent 2 - Itinerary Builder**
+
+```python
+ChatCompletionAgent(
+    name="Agent2_ItineraryBuilder",
+    service=OpenAIChatCompletion(ai_model_id="gpt-4o-mini"),  # Model 3
+    instructions="Use build_itinerary function and request clarifications",
+    kernel=kernel_itinerary,
+)
+```
+
+**Purpose:**
+
+- **Detects** missing information from Agent 1's analysis
+- **Requests** clarification when needed
+- **Generates** LLM-powered travel itineraries
+- **Creates** final travel plans
+
+### **How ChatCompletionAgent Prompt Analysis Works:**
+
+#### **1. Agent-Level Instructions (Permanent Behavior):**
+
+```python
+# These instructions define the agent's identity and capabilities
+instructions="""You are Agent 1: Destination Analyzer (GPT-4o-mini). Your role is to:
+
+1. **Use the analyze_travel_request function** to extract destination, duration, and purpose
+2. **Use the handle_clarification function** ONLY when Agent 2 asks for missing information
+3. **DO NOT call handle_clarification directly** - only Agent 2 should request clarifications
+4. **DO NOT hallucinate** - if information is missing, indicate it in the missing_info field
+5. **Provide structured JSON output** for Agent 2 to process
+
+**IMPORTANT: You MUST use the available functions:**
+- Use `analyze_travel_request` to analyze the initial request
+- Use `handle_clarification` ONLY when Agent 2 asks for missing info
+
+**Debug Messages**:
+- Start with: "🔍 Agent 1: Destination Analyzer (GPT-4o-mini): Extracted [destination, duration, purpose]"
+- If asked for clarification: "🔄 Agent 1: Destination Analyzer (GPT-4o-mini): Processing clarification request from Agent 2"
+- After user clarification: "✅ Agent 1: Destination Analyzer (GPT-4o-mini): Updated analysis with user clarification"
+
+**Focus on**:
+- Destination (where they want to go)
+- Duration (how long the trip should be)
+- Purpose (why they're traveling - vacation, business, etc.)
+- Missing information that needs clarification
+
+**CRITICAL: Do NOT call handle_clarification directly. Only Agent 2 should request clarifications.**
+
+Keep your analysis simple and focused on the essential travel planning elements."""
+```
+
+#### **2. Task-Level Instructions (Specific Coordination):**
+
+```python
+# These instructions define how agents should coordinate for this specific task
+task="""Please help me plan a trip: "Plan a trip to Japan"
+
+**IMPORTANT: Follow the EXACT coordination flow - Agent 1 analyzes, Agent 2 requests clarifications**
+
+**EXACT Step-by-Step Process**:
+1. **Agent 1: Destination Analyzer (GPT-4o-mini)**: Use `analyze_travel_request` function to extract destination, duration, and purpose
+2. **Agent 2: Itinerary Builder (GPT-4o-mini)**: Use `build_itinerary` function to check if information is missing
+3. **If missing info**: Agent 2 will ask Agent 1 for clarification
+4. **Agent 1**: If Agent 2 asks for missing info, use `handle_clarification` function to process the clarification
+5. **Agent 2**: Create the final itinerary only when all info is complete
+
+**CRITICAL: Use the available functions:**
+- Agent 1: Use `analyze_travel_request` and `handle_clarification` functions
+- Agent 2: Use `build_itinerary` function
+
+**EXACT Coordination Flow**:
+- Agent 1 analyzes the request and returns analysis with missing_info if any
+- Agent 2 checks the analysis and requests clarification from Agent 1 if info is missing
+- Agent 1 processes the clarification request using `handle_clarification` function ONLY when Agent 2 asks
+- Agent 2 creates the final itinerary when all information is complete
+
+**CRITICAL RULES**:
+- Agent 1 should NOT call handle_clarification directly
+- Agent 1 should NOT hallucinate missing information
+- Agent 1 should indicate missing info in the missing_info field
+- Agent 2 should request clarification from Agent 1 when info is missing
+- Agent 1 should use `handle_clarification` function to process clarification requests
+- Only proceed with itinerary creation when all required information is available
+
+**Debug Messages to Show**:
+- "🔍 Agent 1: Destination Analyzer (GPT-4o-mini): Extracted [destination, duration, purpose]"
+- "❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing [missing_info], requesting clarification from Agent 1"
+- "🔄 Agent 1: Destination Analyzer (GPT-4o-mini): Processing clarification request from Agent 2"
+- "✅ Agent 1: Destination Analyzer (GPT-4o-mini): Updated analysis with user clarification"
+- "📝 Agent 2: Itinerary Builder (GPT-4o-mini): Creating itinerary with complete information"
+
+**Expected Output**:
+- Clear day-by-day travel itinerary with actual content
+- Practical activities and recommendations
+- Accommodation and transportation tips
+- Budget considerations
+
+**CRITICAL: Agent 2 must return the actual itinerary content, not just a message saying the itinerary is ready.**
+
+Keep it simple and practical!"""
+```
+
+#### **3. Function-Level Instructions (Plugin Functions):**
+
+```python
+# These instructions are embedded in the plugin functions themselves
+@kernel_function(
+    description="Analyze travel request and extract key information",
+    name="analyze_travel_request"
+)
+async def analyze_travel_request(self, user_request: str) -> str:
+    """
+    Extract destination, duration, and purpose from travel request using LLM.
+
+    This function uses LLM for natural language understanding to identify:
+    - Destination: Where the user wants to travel
+    - Duration: How long the trip should be
+    - Purpose: Why they're traveling (vacation, business, etc.)
+
+    Args:
+        user_request (str): Natural language travel request from user
+
+    Returns:
+        str: JSON string containing structured analysis with missing_info field
+    """
+    # LLM prompt for structured extraction
+    prompt = f"""
+    Analyze this travel request and extract key information: "{user_request}"
+
+    Extract the following information:
+    1. **Destination**: Where they want to travel (city, country, region)
+    2. **Duration**: How long the trip should be (e.g., "7 days", "2 weeks", "1 month")
+    3. **Purpose**: Why they're traveling (e.g., "vacation", "business", "cherry blossom viewing", "beach vacation")
+
+    Return ONLY a valid JSON object with these fields:
+    - destination: string (use "Unknown" if not found)
+    - duration: string (use null if not found)
+    - purpose: string (default to "General Travel" if not specified)
+    - missing_info: array of strings (list what's missing: "destination", "duration", etc.)
+
+    Examples:
+    - "Plan a trip to Japan for cherry blossoms" → {{"destination": "Japan", "duration": null, "purpose": "Cherry Blossom Viewing", "missing_info": ["duration"]}}
+    - "I want to visit Paris for 5 days" → {{"destination": "Paris", "duration": "5 days", "purpose": "General Travel", "missing_info": []}}
+    - "Plan a beach vacation in Bali" → {{"destination": "Bali", "duration": null, "purpose": "Beach Vacation", "missing_info": ["duration"]}}
+
+    Return ONLY the JSON, no other text.
+    """
+```
+
+### **Prompt Analysis Flow:**
+
+#### **Step 1: Agent Initialization**
+
+```python
+# Each agent gets its instructions during creation
+ChatCompletionAgent(
+    instructions="Agent-level instructions define permanent behavior",
+    # These instructions become part of the agent's identity
+)
+```
+
+#### **Step 2: Task Assignment**
+
+```python
+# When a task is assigned, task-level instructions are added
+await group_chat.invoke(
+    task="Task-level instructions define specific coordination",
+    # These instructions override or supplement agent-level instructions
+)
+```
+
+#### **Step 3: Function Execution**
+
+```python
+# When agents call functions, function-level instructions are used
+@kernel_function(description="Function-level instructions")
+async def analyze_travel_request(self, user_request: str) -> str:
+    # Function-specific prompts and logic
+```
+
+### **The 3 Models Work Together:**
+
+```
+User Request
+    ↓
+Model 1 (Group Chat Manager): "Which agent should speak next?"
+    ↓
+Model 2 (Agent 1): "I'll analyze this request using my functions"
+    ↓
+Model 2 calls: analyze_travel_request() with function-level prompt
+    ↓
+Model 1: "Agent 2 should speak next"
+    ↓
+Model 3 (Agent 2): "I'll check for missing info and create itinerary"
+    ↓
+Model 3 calls: build_itinerary() with function-level prompt
+    ↓
+Final Result
+```
+
+### **Key Insights:**
+
+✅ **Each model has a specific role** - No overlap in responsibilities
+✅ **Instructions are layered** - Agent-level + Task-level + Function-level
+✅ **Context is shared** - All models see the conversation history
+✅ **Functions are isolated** - Each agent only sees its own functions
+✅ **Coordination is explicit** - Clear rules for how agents work together
+
+## 🤖 **5. Agents, Plugins, and Tools**
 
 ### **Agent 1: Destination Analyzer**
 
