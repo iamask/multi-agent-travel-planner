@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# AI Research Assistant Activation Script
-echo "🎓 AI Research Assistant - Multi-Agent System"
-echo "=============================================="
+# Multi-Agent Travel Planner Activation Script
+echo "✈️ Multi-Agent Travel Planner System"
+echo "====================================="
 
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
@@ -28,9 +28,8 @@ fi
 echo "✅ Environment ready!"
 echo ""
 echo "🚀 Available commands:"
-echo "  python ai_research_assistant.py     - Run the main AI Research Assistant"
-echo "  python demo_research_assistant.py   - Run the demo script"
+echo "  python travel_planner.py     - Run the Multi-Agent Travel Planner"
 echo ""
 echo "🎯 Example usage:"
-echo "  python -c \"import asyncio; from ai_research_assistant import run_orchestrated_research; asyncio.run(run_orchestrated_research('What are the challenges in implementing AI in hospitals?'))\""
+echo "  python -c \"import asyncio; from travel_planner import run_simple_travel_planner; asyncio.run(run_simple_travel_planner('Plan a trip to Japan for cherry blossoms'))\""
 echo "" 

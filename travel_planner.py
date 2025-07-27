@@ -31,18 +31,17 @@ Key Features:
 import os
 import asyncio
 import json
-from typing import Dict, Any, List
+from typing import List
 from dotenv import load_dotenv
 from semantic_kernel import Kernel
 from semantic_kernel.agents import ChatCompletionAgent, GroupChatOrchestration, RoundRobinGroupChatManager
 from semantic_kernel.agents.runtime import InProcessRuntime
-from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
+from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion, OpenAIPromptExecutionSettings
 from semantic_kernel.functions import kernel_function
 from semantic_kernel.kernel_pydantic import KernelBaseModel
 from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
 
 # Pydantic models for structured output
-# This ensures type-safe JSON responses from the LLM
 class TravelAnalysis(KernelBaseModel):
     """
     Structured output for travel request analysis.
@@ -83,8 +82,6 @@ class DestinationAnalyzerPlugin:
     """
     
     def __init__(self):
-        # Initialize kernel for this plugin
-        # The kernel provides access to LLM services and manages plugin registration
         self.kernel = Kernel()
     
     @kernel_function(
@@ -107,16 +104,9 @@ class DestinationAnalyzerPlugin:
             str: JSON string containing structured analysis with missing_info field
         """
         print(f"[DEBUG] 🔍 Agent 1: Destination Analyzer (GPT-4o-mini): Starting LLM analysis of: {user_request}")
-        print(f"[DEBUG] 🔍 Agent 1: This function should ONLY analyze, NOT call handle_clarification")
         
-        # Create LLM service for analysis
-        # This is the only place where we use LLM in this plugin
-        # The LLM will extract structured information from natural language
         llm_service = OpenAIChatCompletion(ai_model_id="gpt-4o-mini")
         
-        # Craft a detailed prompt for LLM extraction
-        # This prompt instructs the LLM to extract structured information and return valid JSON
-        # The LLM will analyze natural language and identify destination, duration, and purpose
         prompt = f"""
         Analyze this travel request and extract key information: "{user_request}"
         
@@ -140,28 +130,21 @@ class DestinationAnalyzerPlugin:
         """
         
         try:
-            # Create settings for the LLM request with structured output
-            # These settings ensure the LLM returns structured, consistent responses
-            from semantic_kernel.connectors.ai.open_ai import OpenAIPromptExecutionSettings
-            
             settings = OpenAIPromptExecutionSettings(
-                max_tokens=200,  # Limit response length for efficiency
-                temperature=0.1,  # Low temperature for more consistent, deterministic output
+                max_tokens=200,
+                temperature=0.1,
                 function_choice_behavior=FunctionChoiceBehavior.Auto(),
-                response_format=TravelAnalysis  # Use Pydantic model for guaranteed structured output
+                response_format=TravelAnalysis
             )
             
-            # Get LLM response using the correct method
             response = await llm_service.get_text_content(prompt, settings)
             llm_result = response.text.strip()
             
             print(f"[DEBUG] 🤖 LLM Response: {llm_result}")
             
-            # Parse structured response from LLM
             analysis = json.loads(llm_result)
             
             # Calculate missing info based on what we have
-            # This helps Agent 2 know what information is missing and needs clarification
             missing_info = []
             if not analysis.get("duration"):
                 missing_info.append("duration")
@@ -177,8 +160,6 @@ class DestinationAnalyzerPlugin:
             print(f"[DEBUG] ❌ LLM parsing error: {e}")
             print(f"[DEBUG] ❌ Agent 1: Destination Analyzer failed to process request")
             
-            # Return error when LLM fails - no fallback
-            # This ensures Agent 2 knows that Agent 1 failed and can handle the error
             return json.dumps({
                 "destination": "Unknown",
                 "duration": None,
@@ -186,8 +167,6 @@ class DestinationAnalyzerPlugin:
                 "missing_info": ["destination", "duration"],
                 "error": f"Agent 1 failed to analyze request: {str(e)}"
             })
-    
-
     
     @kernel_function(
         description="Handle user clarifications and update analysis",
@@ -210,33 +189,25 @@ class DestinationAnalyzerPlugin:
         print(f"[DEBUG] 🔄 Agent 1: Destination Analyzer (GPT-4o-mini) Plugin: handle_clarification called")
         print(f"[DEBUG] 📥 Original analysis: {original_analysis}")
         print(f"[DEBUG] 📥 User clarification: {user_clarification}")
-        print(f"[DEBUG] 🔍 This should only be called when Agent 2 requests clarification")
         
         try:
-            # Parse the original analysis JSON from Agent 1's initial analysis
-            # This contains the missing_info that Agent 2 detected
             analysis = json.loads(original_analysis)
-            clarification_lower = user_clarification.lower()
             
-            print(f"[DEBUG] 🔍 Processing clarification: {clarification_lower}")
+            print(f"[DEBUG] 🔍 Processing clarification")
             
             # Update duration if it was missing - use simple default
-            # This is the only place where we set default values for missing information
             if "duration" in analysis.get("missing_info", []):
                 print(f"[DEBUG] ⏰ Duration missing - using default: 7 days")
-                analysis["duration"] = "7 days"  # Simple default, no complex extraction
+                analysis["duration"] = "7 days"
                 print(f"[DEBUG] ✅ Set duration to 7 days (default)")
             
             # Update destination if it was missing - use simple default
-            # This ensures we always have a destination, even if user didn't specify one
             if "destination" in analysis.get("missing_info", []):
                 print(f"[DEBUG] 🎯 Destination missing - using default: India")
-                analysis["destination"] = "India"  # Simple default, no complex extraction
+                analysis["destination"] = "India"
                 print(f"[DEBUG] ✅ Set destination to India (default)")
             
             # Remove resolved missing info from the missing_info list
-            # This helps Agent 2 know that the information is now complete
-            # Agent 2 will only create an itinerary when missing_info is empty
             resolved_items = []
             for item in analysis.get("missing_info", []):
                 if item == "duration" and analysis.get("duration"):
@@ -247,7 +218,6 @@ class DestinationAnalyzerPlugin:
                     print(f"[DEBUG] ✅ Resolved destination")
             
             # Remove resolved items from missing_info list
-            # This is crucial for Agent 2 to know that all info is now available
             for item in resolved_items:
                 analysis["missing_info"].remove(item)
             
@@ -282,8 +252,6 @@ class ItineraryBuilderPlugin:
     """
     
     def __init__(self):
-        # Initialize kernel for this plugin
-        # The kernel provides access to LLM services and manages plugin registration
         self.kernel = Kernel()
     
     @kernel_function(
@@ -308,45 +276,35 @@ class ItineraryBuilderPlugin:
         print(f"[DEBUG] 📊 Input analysis: {analysis}")
         
         try:
-            # Parse the analysis JSON from Agent 1
-            # This contains the structured analysis with destination, duration, purpose, and missing_info
             data = json.loads(analysis)
-            
-            # Check if Agent 1 failed during analysis
-            # This handles cases where the LLM couldn't parse the request properly
-            if "error" in data:
-                print(f"[DEBUG] ❌ Agent 2: Itinerary Builder (GPT-4o-mini): Agent 1 failed: {data.get('error')}")
-                return f"❌ Travel planning failed: {data.get('error')}. Please try again."
-            
-            # Extract travel information from Agent 1's analysis
-            # These fields are guaranteed to exist due to the Pydantic model structure
-            destination = data.get("destination", "Unknown")
-            duration = data.get("duration", "7 days")
-            purpose = data.get("purpose", "General Travel")
-            missing_info = data.get("missing_info", [])  # This is the key field for coordination
-            
-            print(f"[DEBUG] 🎯 Agent 2: Itinerary Builder (GPT-4o-mini): Destination={destination}, Duration={duration}, Purpose={purpose}")
-            
-            # If missing info, request clarification from Agent 1
-            # This is the key coordination point - Agent 2 detects missing info and requests clarification
-            # Agent 2 will only create an itinerary when all information is complete
-            if missing_info:
-                print(f"[DEBUG] ❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing info detected: {missing_info}")
-                print(f"[DEBUG] ❓ Agent 2: Itinerary Builder (GPT-4o-mini): Asking Agent 1 for clarification")
-                print(f"[DEBUG] 🔄 Agent 2: This is the CORRECT flow - Agent 2 requesting clarification from Agent 1")
-                return self._request_clarification(missing_info)
-            
-            # Generate LLM-powered itinerary based on available information
-            # This only happens when all required information is complete (missing_info is empty)
-            print(f"[DEBUG] 📝 Agent 2: Itinerary Builder (GPT-4o-mini): All info complete, creating LLM-generated itinerary")
-            # Use LLM to generate dynamic, destination-specific itinerary
-            # The itinerary will be unique for each destination, duration, and purpose
-            print(f"[DEBUG] 🎯 Agent 2: Itinerary Builder (GPT-4o-mini): Creating LLM-generated itinerary for {destination}")
-            return await self._generate_general_itinerary(destination, duration, purpose)
-                
         except json.JSONDecodeError as e:
-            print(f"[DEBUG] ❌ Error parsing analysis: {e}")
-            return "Error processing travel request. Please try again."
+            print(f"[DEBUG] ❌ Agent 2: JSON parsing error: {e}")
+            print(f"[DEBUG] ❌ Agent 2: Raw analysis received: {analysis}")
+            return "Error: Could not parse Agent 1's analysis. Please try again."
+        
+        # Check if Agent 1 failed during analysis
+        if "error" in data:
+            print(f"[DEBUG] ❌ Agent 2: Itinerary Builder (GPT-4o-mini): Agent 1 failed: {data.get('error')}")
+            return f"❌ Travel planning failed: {data.get('error')}. Please try again."
+        
+        # Extract travel information from Agent 1's analysis
+        destination = data.get("destination", "Unknown")
+        duration = data.get("duration", "7 days")
+        purpose = data.get("purpose", "General Travel")
+        missing_info = data.get("missing_info", [])
+        
+        print(f"[DEBUG] 🎯 Agent 2: Itinerary Builder (GPT-4o-mini): Destination={destination}, Duration={duration}, Purpose={purpose}")
+        
+        # If missing info, request clarification from Agent 1
+        if missing_info:
+            print(f"[DEBUG] ❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing info detected: {missing_info}")
+            print(f"[DEBUG] ❓ Agent 2: Itinerary Builder (GPT-4o-mini): Asking Agent 1 for clarification")
+            return self._request_clarification(missing_info)
+        
+        # Generate LLM-powered itinerary based on available information
+        print(f"[DEBUG] 📝 Agent 2: Itinerary Builder (GPT-4o-mini): All info complete, creating LLM-generated itinerary")
+        print(f"[DEBUG] 🎯 Agent 2: Itinerary Builder (GPT-4o-mini): Creating LLM-generated itinerary for {destination}")
+        return await self._generate_general_itinerary(destination, duration, purpose)
     
     def _request_clarification(self, missing_info: List[str]) -> str:
         """
@@ -365,8 +323,6 @@ class ItineraryBuilderPlugin:
         print(f"[DEBUG] ❓ Agent 2: Itinerary Builder (GPT-4o-mini) Plugin: _request_clarification called")
         print(f"[DEBUG] 📋 Missing info: {missing_info}")
         
-        # Create specific questions for each missing piece of information
-        # These questions help Agent 1 understand what information is needed
         questions = []
         
         if "duration" in missing_info:
@@ -376,9 +332,6 @@ class ItineraryBuilderPlugin:
             questions.append("Where would you like to travel?")
             print(f"[DEBUG] ❓ Added destination question")
         
-        # Create structured clarification request
-        # This format allows Agent 1 to understand what information is needed
-        # Agent 1 will use this to determine which defaults to apply
         result = {
             "needs_clarification": True,
             "questions": questions,
@@ -387,8 +340,6 @@ class ItineraryBuilderPlugin:
         
         print(f"[DEBUG] 📤 Agent 2: Itinerary Builder (GPT-4o-mini): Clarification request: {result}")
         return json.dumps(result)
-    
-
     
     async def _generate_general_itinerary(self, destination: str, duration: str, purpose: str) -> str:
         """
@@ -407,10 +358,8 @@ class ItineraryBuilderPlugin:
         """
         print(f"[DEBUG] 🤖 Agent 2: Using LLM to generate itinerary for {destination}")
         
-        # Create LLM service for itinerary generation
         llm_service = OpenAIChatCompletion(ai_model_id="gpt-4o-mini")
         
-        # Craft a detailed prompt for LLM itinerary generation
         prompt = f"""
         Create a detailed {duration} travel itinerary for {destination} for {purpose.lower()} travel.
         
@@ -444,16 +393,12 @@ class ItineraryBuilderPlugin:
         """
         
         try:
-            # Create settings for the LLM request
-            from semantic_kernel.connectors.ai.open_ai import OpenAIPromptExecutionSettings
-            
             settings = OpenAIPromptExecutionSettings(
-                max_tokens=1000,  # More tokens for detailed itineraries
-                temperature=0.7,  # Slightly higher for creative content
+                max_tokens=1000,
+                temperature=0.7,
                 function_choice_behavior=FunctionChoiceBehavior.Auto()
             )
             
-            # Get LLM response for itinerary generation
             response = await llm_service.get_text_content(prompt, settings)
             itinerary = response.text.strip()
             
@@ -462,7 +407,6 @@ class ItineraryBuilderPlugin:
             
         except Exception as e:
             print(f"[DEBUG] ❌ Agent 2: LLM itinerary generation failed: {e}")
-            # Simple fallback if LLM fails
             return f"# Travel Itinerary: {destination} ({duration})\n\nPlan your {duration} trip to {destination} for {purpose.lower()} travel.\n\n*LLM generation failed - please try again.*"
 
 def get_travel_agents():
@@ -490,95 +434,60 @@ def get_travel_agents():
         List[ChatCompletionAgent]: List of configured agents for the multi-agent travel planner
     """
     # Create separate kernels for each agent
-    # This is the recommended approach for clean, scalable multi-agent systems
-    # Each agent only sees its own plugins, preventing confusion and ensuring isolation
-    
-    # Agent 1 kernel with only Destination Analyzer plugin
     kernel_analyzer = Kernel()
     kernel_analyzer.add_plugin(DestinationAnalyzerPlugin(), "DestinationAnalyzer")
     
-    # Agent 2 kernel with only Itinerary Builder plugin  
     kernel_itinerary = Kernel()
     kernel_itinerary.add_plugin(ItineraryBuilderPlugin(), "ItineraryBuilder")
     
     return [
-        # Agent 1: Destination Analyzer - Analyzes user input with LLM
-        # This agent is the first in the multi-agent system
-        # It analyzes user input and returns structured JSON for Agent 2 to use
-        # Has access ONLY to DestinationAnalyzer plugin functions
         ChatCompletionAgent(
             name="Agent1_DestinationAnalyzer",
             description="Agent 1: Destination Analyzer (GPT-4o-mini)",
             instructions="""You are Agent 1: Destination Analyzer (GPT-4o-mini). Your role is to:
 
-1. **Use the analyze_travel_request function** to extract destination, duration, and purpose from travel requests
-2. **Use the handle_clarification function** ONLY when Agent 2 asks for missing information
-3. **DO NOT call handle_clarification directly** - only Agent 2 should request clarifications
-4. **DO NOT hallucinate** - if information is missing, indicate it in the missing_info field
-5. **Provide structured JSON output** for Agent 2 to process
+1. **ALWAYS start by calling analyze_travel_request** with the user's travel request
+2. **Return ONLY the JSON result** from analyze_travel_request - no additional text
+3. **Use handle_clarification ONLY** when Agent 2 specifically asks for missing information
+4. **DO NOT add explanations or extra text** - just return the function results
+
+**CRITICAL WORKFLOW:**
+1. When you receive a travel request, IMMEDIATELY call analyze_travel_request
+2. Return ONLY the JSON output from analyze_travel_request
+3. Wait for Agent 2 to process your analysis
+4. If Agent 2 asks for clarification, call handle_clarification and return the updated JSON
 
 **IMPORTANT: You MUST use the available functions:**
 - Use `analyze_travel_request` to analyze the initial request
 - Use `handle_clarification` ONLY when Agent 2 asks for missing info
 
-**Debug Messages**:
-- Start with: "🔍 Agent 1: Destination Analyzer (GPT-4o-mini): Extracted [destination, duration, purpose]"
-- If asked for clarification: "🔄 Agent 1: Destination Analyzer (GPT-4o-mini): Processing clarification request from Agent 2"
-- After user clarification: "✅ Agent 1: Destination Analyzer (GPT-4o-mini): Updated analysis with user clarification"
-
-**Focus on**:
-- Destination (where they want to go)
-- Duration (how long the trip should be)
-- Purpose (why they're traveling - vacation, business, etc.)
-- Missing information that needs clarification
-
-**CRITICAL: Do NOT call handle_clarification directly. Only Agent 2 should request clarifications.**
-
-Keep your analysis simple and focused on the essential travel planning elements.""",
-            # AGENT-LEVEL INSTRUCTIONS: Define the agent's permanent behavior and capabilities
-            # These instructions are part of the agent's identity and don't change between tasks
-            # They define what this agent can do and how it should behave in general
-            service=OpenAIChatCompletion(
-                ai_model_id="gpt-4o-mini"
-            ),
-            kernel=kernel_analyzer,  # Connect agent to its own kernel with only DestinationAnalyzer plugin
+**CRITICAL: Return ONLY function results, no additional text or explanations.**""",
+            service=OpenAIChatCompletion(ai_model_id="gpt-4o-mini"),
+            kernel=kernel_analyzer,
         ),
-        # Agent 2: Itinerary Builder - Generates itineraries using structured output from Agent 1
-        # This agent is the second in the multi-agent system
-        # It can reach back to Agent 1 if information is missing
-        # Has access ONLY to ItineraryBuilder plugin functions
         ChatCompletionAgent(
             name="Agent2_ItineraryBuilder", 
             description="Agent 2: Itinerary Builder (GPT-4o-mini)",
             instructions="""You are Agent 2: Itinerary Builder (GPT-4o-mini). Your role is to:
 
-1. **Use the build_itinerary function** to create itineraries based on Agent 1's analysis
-2. **Check for missing information** and ask Agent 1 for clarification if needed
-3. **Only create itineraries** when all required information is available
-4. **Return the actual itinerary content** from the build_itinerary function
+1. **ALWAYS start by calling build_itinerary** with Agent 1's analysis
+2. **Return ONLY the result** from build_itinerary - no additional text
+3. **Process Agent 1's JSON analysis** to create itineraries or request clarifications
+4. **DO NOT add explanations or extra text** - just return the function results
+
+**CRITICAL WORKFLOW:**
+1. When you receive Agent 1's analysis, IMMEDIATELY call build_itinerary
+2. Pass Agent 1's JSON analysis to build_itinerary
+3. Return ONLY the output from build_itinerary (itinerary or clarification request)
+4. If build_itinerary returns a clarification request, wait for Agent 1's response
 
 **IMPORTANT: You MUST use the available functions:**
 - Use `build_itinerary` to process Agent 1's analysis and create itineraries
-- **DO NOT add extra text or explanations** - just return the itinerary content
+- **DO NOT add extra text or explanations** - just return the function results
 
-**Debug Messages**:
-- If missing info: "❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing [missing_info], requesting clarification from Agent 1"
-- When creating itinerary: "📝 Agent 2: Itinerary Builder (GPT-4o-mini): Creating itinerary with complete information"
-
-**Focus on**:
-- Day-by-day structure with clear activities
-- Practical details like accommodation and transportation
-- Budget-friendly and luxury options
-- Local experiences and cultural activities
-
-**CRITICAL: Return only the itinerary content, no additional text or explanations.**""",
-            # AGENT-LEVEL INSTRUCTIONS: Define the agent's permanent behavior and capabilities
-            # These instructions are part of the agent's identity and don't change between tasks
-            # They define what this agent can do and how it should behave in general
-            service=OpenAIChatCompletion(
-                ai_model_id="gpt-4o-mini"
-            ),
-            kernel=kernel_itinerary,  # Connect agent to its own kernel with only ItineraryBuilder plugin
+**CRITICAL: Return only function results, no additional text or explanations.**""",
+            service=OpenAIChatCompletion(ai_model_id="gpt-4o-mini"),
+            kernel=kernel_itinerary,
         ),
     ]
 
@@ -607,24 +516,15 @@ async def run_simple_travel_planner(user_request: str):
     print(f"✈️ Travel Request: {user_request}")
     print("🤖 Initializing Simple Travel Planner...")
     
-    # Create agents with kernel and plugins
-    # These agents will collaborate to analyze the request and create an itinerary
-    # Agent 1 will analyze, Agent 2 will detect missing info and request clarification
     agents = get_travel_agents()
     print(f"[DEBUG] 🤖 Created {len(agents)} agents: {[agent.name for agent in agents]}")
     
-    # Create group chat for agent collaboration
-    # RoundRobinGroupChatManager ensures agents take turns in the conversation
-    # This enables the feedback loop where Agent 2 can request clarification from Agent 1
     group_chat = GroupChatOrchestration(
         members=agents,
-        manager=RoundRobinGroupChatManager(max_rounds=5),  # Increased for feedback loops
+        manager=RoundRobinGroupChatManager(max_rounds=3),
     )
-    print(f"[DEBUG] 💬 Created Agent group chat with max_rounds=5")
+    print(f"[DEBUG] 💬 Created Agent group chat with max_rounds=3")
     
-    # Initialize runtime for agent execution
-    # This manages the execution environment for the agents
-    # The runtime handles the actual execution of agent conversations
     runtime = InProcessRuntime()
     runtime.start()
     print(f"[DEBUG] ⚡ Runtime started")
@@ -633,62 +533,20 @@ async def run_simple_travel_planner(user_request: str):
     print("=" * 50)
     
     try:
-        # Send the travel request to the agent group
-        # The agents will collaborate to analyze and create an itinerary
         print(f"[DEBUG] 📤 Sending task to group chat: {user_request}")
         result = await group_chat.invoke(
-            task=f"""Please help me plan a trip: "{user_request}"
+            task=f"""Plan a trip: "{user_request}"
 
-**IMPORTANT: Follow the EXACT coordination flow - Agent 1 analyzes, Agent 2 requests clarifications**
+**COORDINATION FLOW:**
+1. Agent 1: Analyze the request and extract destination, duration, purpose
+2. Agent 2: Use Agent 1's analysis to create a detailed itinerary
+3. If information is missing, Agent 2 asks Agent 1 for clarification
+4. Agent 1 provides clarification, Agent 2 creates final itinerary
 
-**EXACT Step-by-Step Process**:
-1. **Agent 1: Destination Analyzer (GPT-4o-mini)**: Use `analyze_travel_request` function to extract destination, duration, and purpose
-2. **Agent 2: Itinerary Builder (GPT-4o-mini)**: Use `build_itinerary` function to check if information is missing
-3. **If missing info**: Agent 2 will ask Agent 1 for clarification
-4. **Agent 1**: If Agent 2 asks for missing info, use `handle_clarification` function to process the clarification
-5. **Agent 2**: Create the final itinerary only when all info is complete
-
-**CRITICAL: Use the available functions:**
-- Agent 1: Use `analyze_travel_request` and `handle_clarification` functions
-- Agent 2: Use `build_itinerary` function
-
-**EXACT Coordination Flow**:
-- Agent 1 analyzes the request and returns analysis with missing_info if any
-- Agent 2 checks the analysis and requests clarification from Agent 1 if info is missing
-- Agent 1 processes the clarification request using `handle_clarification` function ONLY when Agent 2 asks
-- Agent 2 creates the final itinerary when all information is complete
-
-**CRITICAL RULES**:
-- Agent 1 should NOT call handle_clarification directly
-- Agent 1 should NOT hallucinate missing information
-- Agent 1 should indicate missing info in the missing_info field
-- Agent 2 should request clarification from Agent 1 when info is missing
-- Agent 1 should use `handle_clarification` function to process clarification requests
-- Only proceed with itinerary creation when all required information is available
-
-**Debug Messages to Show**:
-- "🔍 Agent 1: Destination Analyzer (GPT-4o-mini): Extracted [destination, duration, purpose]"
-- "❓ Agent 2: Itinerary Builder (GPT-4o-mini): Missing [missing_info], requesting clarification from Agent 1"
-- "🔄 Agent 1: Destination Analyzer (GPT-4o-mini): Processing clarification request from Agent 2"
-- "✅ Agent 1: Destination Analyzer (GPT-4o-mini): Updated analysis with user clarification"
-- "📝 Agent 2: Itinerary Builder (GPT-4o-mini): Creating itinerary with complete information"
-
-**Expected Output**:
-- Clear day-by-day travel itinerary with actual content
-- Practical activities and recommendations
-- Accommodation and transportation tips
-- Budget considerations
-
-**CRITICAL: Agent 2 must return the actual itinerary content, not just a message saying the itinerary is ready.**
-
-Keep it simple and practical!""",
-            # TASK-LEVEL INSTRUCTIONS: Define the specific coordination flow for this particular task
-            # These instructions are specific to the travel planning task and define how agents should coordinate
-            # They override or supplement the agent-level instructions for this specific task
+**CRITICAL: Return ONLY the final itinerary content, no explanations.**""",
             runtime=runtime,
         )
         
-        # Get the final result from the agent collaboration
         print(f"[DEBUG] 📥 Received result from group chat")
         value = await result.get()
         print(f"[DEBUG] 📋 Final value: {value}")
@@ -700,13 +558,11 @@ Keep it simple and practical!""",
         return value
         
     except Exception as e:
-        # Handle any errors during the travel planning process
         print(f"❌ Error: {e}")
         print(f"[DEBUG] ❌ Exception details: {type(e).__name__}: {str(e)}")
         return None
     
     finally:
-        # Clean up runtime resources
         print(f"[DEBUG] 🛑 Stopping runtime")
         await runtime.stop_when_idle()
 
@@ -729,28 +585,23 @@ async def interactive_travel_session():
     
     while True:
         try:
-            # Get travel request from user
             user_request = input("\n✈️ Your travel request: ").strip()
             print(f"[DEBUG] 👤 User input received: '{user_request}'")
             
-            # Check for exit commands
             if user_request.lower() in ['quit', 'exit', 'q']:
                 print("[DEBUG] 👋 User requested to quit")
                 print("👋 Thank you for using the Travel Planner!")
                 break
             
-            # Validate user input
             if not user_request:
                 print("[DEBUG] ❌ Empty user input")
                 print("❌ Please enter a valid travel request.")
                 continue
             
-            # Process the travel request using the multi-agent system
             print(f"[DEBUG] 🚀 Starting travel planning for: '{user_request}'")
             print("\n🔄 Planning your trip...")
             result = await run_simple_travel_planner(user_request)
             
-            # Handle the result
             if result:
                 print(f"[DEBUG] ✅ Travel planning successful")
                 print("\n✅ Travel planning completed!")
@@ -759,12 +610,10 @@ async def interactive_travel_session():
                 print("\n❌ Travel planning failed. Please try again.")
                 
         except KeyboardInterrupt:
-            # Handle Ctrl+C gracefully
             print(f"[DEBUG] ⌨️ Keyboard interrupt received")
             print("\n\n👋 Goodbye!")
             break
         except Exception as e:
-            # Handle any unexpected errors
             print(f"[DEBUG] ❌ Exception in interactive session: {type(e).__name__}: {str(e)}")
             print(f"\n❌ Error: {e}")
             print("Please try again.")
@@ -782,13 +631,9 @@ async def main():
     print("🚀 Starting Simple Travel Planner System")
     print("[DEBUG] 🚀 Main function started")
     
-    # Load environment variables from .env file
-    # This includes the OpenAI API key needed for the agents
     load_dotenv()
     print("[DEBUG] 📄 Environment variables loaded")
     
-    # Check for OpenAI API key
-    # The API key is required for the GPT-4o-mini model used by the agents
     if not os.getenv("OPENAI_API_KEY"):
         print("[DEBUG] ❌ OpenAI API key not found")
         print("❌ Error: OPENAI_API_KEY not found in environment variables.")
@@ -799,8 +644,6 @@ async def main():
     print("[DEBUG] ✅ OpenAI API key found")
     print("✅ OpenAI API key loaded from .env file.")
     
-    # Example travel requests for user reference
-    # These show the types of requests the system can handle
     example_requests = [
         "Plan a trip to Japan for cherry blossoms.",
         "I want to visit Paris for 5 days.",
@@ -812,14 +655,10 @@ async def main():
     for i, request in enumerate(example_requests, 1):
         print(f"{i}. {request}")
     
-    # Start the interactive session
-    # This is where users can interact with the travel planner
     print("\n🎯 Starting interactive mode...")
     print("[DEBUG] 🎯 Calling interactive_travel_session")
     await interactive_travel_session()
     print("[DEBUG] 🏁 Main function completed")
 
 if __name__ == "__main__":
-    # Run the main function using asyncio
-    # This starts the travel planner system
     asyncio.run(main()) 
