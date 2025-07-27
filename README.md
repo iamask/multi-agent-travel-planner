@@ -55,37 +55,43 @@ flowchart TD
     C --> J[GroupChatOrchestration]
     J --> K[RoundRobinGroupChatManager]
 
-    H --> L{analyze_travel_request<br/>function called?}
-    L -->|Yes| M[Extract destination, duration, purpose]
-    L -->|No| N[Agent uses built-in logic]
-    M --> O{Missing info?}
-    O -->|Yes| P[Return JSON with missing_info]
-    O -->|No| Q[Return complete analysis]
+    %% Agent 1 Components
+    H --> L[Agent 1: analyze_travel_request]
+    L --> M[Extract destination, duration, purpose]
+    M --> N[Return JSON analysis]
+    N --> O{Missing info?}
+    O -->|Yes| P[Agent 2 requests clarification]
+    O -->|No| Q[Agent 2 processes complete analysis]
 
-    I --> R{build_itinerary<br/>function called?}
-    R -->|Yes| S[Check analysis completeness]
-    R -->|No| T[Agent uses built-in logic]
-    S --> U{Missing info?}
-    U -->|Yes| V[Request clarification from Agent 1]
-    U -->|No| W[Generate itinerary]
+    %% Agent 2 Components
+    I --> R[Agent 2: build_itinerary]
+    R --> S[Check analysis completeness]
+    S --> T{Missing info?}
+    T -->|Yes| U[Request clarification from Agent 1]
+    T -->|No| V[Generate itinerary]
 
-    P --> V
-    V --> X[Agent 1: handle_clarification]
-    X --> Y[Process user clarification]
-    Y --> Z[Update analysis with user input]
-    Z --> AA[Remove resolved missing_info]
-    AA --> W
+    %% Feedback Loop
+    P --> W[Agent 1: handle_clarification]
+    U --> W
+    W --> X[Process user clarification]
+    X --> Y[Update analysis with user input]
+    Y --> Z[Remove resolved missing_info]
+    Z --> AA[Agent 2: build_itinerary]
+    AA --> BB[Generate final itinerary]
 
-    Q --> W
-    W --> BB[Final Travel Itinerary]
+    Q --> V
+    V --> CC[Final Travel Itinerary]
 
+    %% Styling
     style A fill:#e1f5fe
     style H fill:#f3e5f5
     style I fill:#f3e5f5
     style E fill:#fff3e0
     style F fill:#fff3e0
-    style Y fill:#e8f5e8
-    style BB fill:#e8f5e8
+    style L fill:#e8f5e8
+    style R fill:#e8f5e8
+    style W fill:#e8f5e8
+    style CC fill:#e8f5e8
 ```
 
 ### **Intelligent Feedback Loop System:**
