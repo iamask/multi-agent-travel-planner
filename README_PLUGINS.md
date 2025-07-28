@@ -631,6 +631,41 @@ kernel.add_plugin(travel_planner_plugin)
 kernel.add_plugin(travel_advisor_plugin)
 ```
 
+### Structured Output with Pydantic Models
+
+The system uses **Semantic Kernel's structured output feature** with Pydantic models for reliable JSON generation:
+
+```python
+# Pydantic models for structured output
+class TravelAnalysis(KernelBaseModel):
+    destination: str = Field(description="The destination for the trip")
+    duration: Optional[str] = Field(default=None, description="Duration of the trip")
+    purpose: str = Field(description="The main purpose of the trip")
+    missing_info: List[str] = Field(default_factory=list, description="List of missing information")
+
+class DefaultValues(KernelBaseModel):
+    defaults: Dict[str, str] = Field(description="Default values for missing travel information")
+
+# Function with structured output
+analyze_request_function = KernelFunctionFromPrompt(
+    function_name="analyze_request",
+    prompt=analyze_request_prompt,
+    description="Analyzes travel requests and returns structured data",
+    execution_settings={
+        "response_format": TravelAnalysis,  # Uses Pydantic model for structured output
+        "temperature": 0.1
+    }
+)
+```
+
+### Benefits of Structured Output
+
+1. **Reliable JSON Generation**: No more markdown code blocks or parsing errors
+2. **Type Safety**: Pydantic models ensure correct data structure
+3. **Validation**: Automatic validation of required fields
+4. **Consistency**: Guaranteed output format across all requests
+5. **Error Prevention**: Eliminates JSON parsing failures
+
 ### Plugin-to-Plugin Communication
 
 ```python
