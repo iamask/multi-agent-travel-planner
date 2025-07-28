@@ -27,23 +27,25 @@ This implementation demonstrates modern Semantic Kernel plugins for multi-agent 
 
 ```mermaid
 graph TD
-    A[User Request] --> B[Agent 1: TravelPlanner.analyze_request]
-    B --> C{Complete Info?}
-    C -->|Yes| D[Agent 2: TravelAdvisor.create_itinerary]
-    C -->|No| E[Agent 2: TravelAdvisor.request_missing_info]
-    E --> F[Agent 1: TravelPlanner.provide_defaults]
-    F --> G[Updated Data]
+    A[🎯 User Request] --> B[🤖 Agent 1<br/>TravelPlanner.analyze_request]
+    B --> C{📋 Complete Info?}
+    C -->|✅ Yes| D[✈️ Agent 2<br/>TravelAdvisor.create_itinerary]
+    C -->|❌ No| E[❓ Agent 2<br/>TravelAdvisor.request_missing_info]
+    E --> F[💡 Agent 1<br/>TravelPlanner.provide_defaults]
+    F --> G[🔄 Updated Data]
     G --> D
-    D --> H[Agent 2: TravelAdvisor.enhance_itinerary]
-    H --> I[Final Enhanced Itinerary]
+    D --> H[✨ Agent 2<br/>TravelAdvisor.enhance_itinerary]
+    H --> I[🎉 Final Enhanced Itinerary]
 
-    style A fill:#e1f5fe
+    style A fill:#e3f2fd
     style B fill:#f3e5f5
+    style C fill:#fff8e1
+    style D fill:#e8f5e8
     style E fill:#fff3e0
     style F fill:#f3e5f5
-    style D fill:#e8f5e8
+    style G fill:#f1f8e9
     style H fill:#e8f5e8
-    style I fill:#e1f5fe
+    style I fill:#e8f5e8
 ```
 
 ## 🚀 Function Calling and Pydantic
