@@ -2,6 +2,37 @@
 
 A sophisticated multi-agent system demonstrating **proper Semantic Kernel plugin architecture** with **function calling** for reliable agent-to-agent communication.
 
+## 📁 Project Structure
+
+```
+multi-agent/
+├── 📄 README.md                    # Project documentation and guide
+├── 🐍 travel_planner.py            # Main multi-agent implementation
+├── 📦 requirements.txt              # Python dependencies
+├── 🔧 activate.sh                   # Environment setup script
+├── 📝 agent_interactions.log        # Detailed agent interaction logs
+├── 🗂️ venv/                        # Python virtual environment
+├── 📄 .env                         # Environment variables (create this)
+└── 📄 .gitignore                   # Git ignore rules
+```
+
+### 📦 Dependencies
+
+```txt
+semantic-kernel[all]>=1.35.0  # Microsoft Semantic Kernel with all features
+python-dotenv>=1.1.1          # Environment variable management
+```
+
+### 🔑 Key Files
+
+| File                         | Purpose                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| **`travel_planner.py`**      | Main implementation with Agent 1 (TravelPlanner) and Agent 2 (TravelAdvisor) |
+| **`requirements.txt`**       | Python dependencies                                                          |
+| **`activate.sh`**            | Setup script that creates venv, installs dependencies, and validates .env    |
+| **`agent_interactions.log`** | Detailed logs of all agent interactions and function calls                   |
+| **`.env`**                   | Environment file for your OpenAI API key (create this file)                  |
+
 ## 🎯 System Overview
 
 This implementation demonstrates modern Semantic Kernel plugins for multi-agent workflows:
@@ -162,37 +193,6 @@ defaults_result = await kernel.invoke("TravelPlanner", "provide_defaults", input
 
 # Agent 2 enhances itinerary
 enhanced_result = await kernel.invoke("TravelAdvisor", "enhance_itinerary", input=final_response)
-```
-
-## 📁 Project Structure
-
-```
-multi-agent/
-├── 📄 README.md                    # Project documentation and guide
-├── 🐍 travel_planner.py            # Main multi-agent implementation
-├── 📦 requirements.txt              # Python dependencies
-├── 🔧 activate.sh                   # Environment setup script
-├── 📝 agent_interactions.log        # Detailed agent interaction logs
-├── 🗂️ venv/                        # Python virtual environment
-├── 📄 .env                         # Environment variables (create this)
-└── 📄 .gitignore                   # Git ignore rules
-```
-
-### Key Files
-
-| File                         | Purpose                                                                      |
-| ---------------------------- | ---------------------------------------------------------------------------- |
-| **`travel_planner.py`**      | Main implementation with Agent 1 (TravelPlanner) and Agent 2 (TravelAdvisor) |
-| **`requirements.txt`**       | Python dependencies: `semantic-kernel[all]>=1.35.0`, `python-dotenv>=1.1.1`  |
-| **`activate.sh`**            | Setup script that creates venv, installs dependencies, and validates .env    |
-| **`agent_interactions.log`** | Detailed logs of all agent interactions and function calls                   |
-| **`.env`**                   | Environment file for your OpenAI API key (create this file)                  |
-
-### Dependencies
-
-```txt
-semantic-kernel[all]>=1.35.0  # Microsoft Semantic Kernel with all features
-python-dotenv>=1.1.1          # Environment variable management
 ```
 
 ## 🚀 Usage
