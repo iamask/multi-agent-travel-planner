@@ -164,13 +164,49 @@ defaults_result = await kernel.invoke("TravelPlanner", "provide_defaults", input
 enhanced_result = await kernel.invoke("TravelAdvisor", "enhance_itinerary", input=final_response)
 ```
 
+## 📁 Project Structure
+
+```
+multi-agent/
+├── 📄 README.md                    # Project documentation and guide
+├── 🐍 travel_planner.py            # Main multi-agent implementation
+├── 📦 requirements.txt              # Python dependencies
+├── 🔧 activate.sh                   # Environment setup script
+├── 📝 agent_interactions.log        # Detailed agent interaction logs
+├── 🗂️ venv/                        # Python virtual environment
+├── 📄 .env                         # Environment variables (create this)
+└── 📄 .gitignore                   # Git ignore rules
+```
+
+### Key Files
+
+| File                         | Purpose                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------- |
+| **`travel_planner.py`**      | Main implementation with Agent 1 (TravelPlanner) and Agent 2 (TravelAdvisor) |
+| **`requirements.txt`**       | Python dependencies: `semantic-kernel[all]>=1.35.0`, `python-dotenv>=1.1.1`  |
+| **`activate.sh`**            | Setup script that creates venv, installs dependencies, and validates .env    |
+| **`agent_interactions.log`** | Detailed logs of all agent interactions and function calls                   |
+| **`.env`**                   | Environment file for your OpenAI API key (create this file)                  |
+
+### Dependencies
+
+```txt
+semantic-kernel[all]>=1.35.0  # Microsoft Semantic Kernel with all features
+python-dotenv>=1.1.1          # Environment variable management
+```
+
 ## 🚀 Usage
 
 ### Quick Start
 
 ```bash
-# Setup environment
+# Option 1: Use the setup script
+./activate.sh
+python3 travel_planner.py
+
+# Option 2: Manual setup
 source venv/bin/activate
+pip install -r requirements.txt
 python3 travel_planner.py
 ```
 
