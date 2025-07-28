@@ -64,7 +64,7 @@ if travel_data.get("missing_info") and len(travel_data["missing_info"]) > 0:
     )
 ```
 
-### Pydantic Models
+### Pydantic Models with KernelBaseModel
 
 The system uses **Pydantic models** with Semantic Kernel's `KernelBaseModel` for type-safe communication:
 
@@ -80,6 +80,42 @@ class DefaultValues(KernelBaseModel):
     budget: Optional[str] = Field(default="moderate", description="Default budget level")
     accommodation: Optional[str] = Field(default="hotel", description="Default accommodation")
     transportation: Optional[str] = Field(default="public transport", description="Default transportation")
+```
+
+#### What is KernelBaseModel?
+
+`KernelBaseModel` is Semantic Kernel's extension of Pydantic's `BaseModel` that provides:
+
+1. **Structured Output**: Enforces JSON schema compliance for AI model responses
+2. **Type Safety**: Ensures data types match expected structure
+3. **Validation**: Automatically validates required fields and data types
+4. **Integration**: Seamlessly works with Semantic Kernel's function calling
+5. **Error Handling**: Provides clear error messages for invalid data
+
+#### How KernelBaseModel Works
+
+```python
+# Define structured output model
+class TravelAnalysis(KernelBaseModel):
+    destination: str = Field(description="The destination for the trip")
+    duration: Optional[str] = Field(default=None, description="Duration of the trip")
+    purpose: str = Field(description="The main purpose of the trip")
+    missing_info: List[str] = Field(default_factory=list, description="List of missing information")
+
+# Configure function to use structured output
+analyze_request_function = KernelFunctionFromPrompt(
+    function_name="analyze_request",
+    prompt=analyze_request_prompt,
+    description="Agent 1: Analyzes travel requests and returns structured JSON data",
+    prompt_execution_settings={
+        "response_format": TravelAnalysis,  # Enforces JSON schema
+        "temperature": 0.1
+    }
+)
+
+# AI model response is automatically validated and converted to TravelAnalysis object
+result = await kernel.invoke("TravelPlanner", "analyze_request", input=user_request)
+travel_data = result.value[0].content  # Already a TravelAnalysis object
 ```
 
 ### Benefits
