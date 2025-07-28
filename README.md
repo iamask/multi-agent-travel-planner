@@ -2,28 +2,28 @@
 
 A sophisticated multi-agent system demonstrating **proper Semantic Kernel plugin architecture** with **function calling** for reliable agent-to-agent communication.
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 multi-agent/
-├── 📄 README.md                    # Project documentation and guide
-├── 🐍 travel_planner.py            # Main multi-agent implementation
-├── 📦 requirements.txt              # Python dependencies
-├── 🔧 activate.sh                   # Environment setup script
-├── 📝 agent_interactions.log        # Detailed agent interaction logs
-├── 🗂️ venv/                        # Python virtual environment
-├── 📄 .env                         # Environment variables (create this)
-└── 📄 .gitignore                   # Git ignore rules
+├── README.md                    # Project documentation and guide
+├── travel_planner.py            # Main multi-agent implementation
+├── requirements.txt              # Python dependencies
+├── activate.sh                   # Environment setup script
+├── agent_interactions.log        # Detailed agent interaction logs
+├── venv/                        # Python virtual environment
+├── .env                         # Environment variables (create this)
+└── .gitignore                   # Git ignore rules
 ```
 
-### 📦 Dependencies
+### Dependencies
 
 ```txt
 semantic-kernel[all]>=1.35.0  # Microsoft Semantic Kernel with all features
 python-dotenv>=1.1.1          # Environment variable management
 ```
 
-### 🔑 Key Files
+### Key Files
 
 | File                         | Purpose                                                                      |
 | ---------------------------- | ---------------------------------------------------------------------------- |
@@ -33,7 +33,7 @@ python-dotenv>=1.1.1          # Environment variable management
 | **`agent_interactions.log`** | Detailed logs of all agent interactions and function calls                   |
 | **`.env`**                   | Environment file for your OpenAI API key (create this file)                  |
 
-## 🎯 System Overview
+## System Overview
 
 This implementation demonstrates modern Semantic Kernel plugins for multi-agent workflows:
 
@@ -42,7 +42,7 @@ This implementation demonstrates modern Semantic Kernel plugins for multi-agent 
 - **Function Calling**: Uses structured function calls for reliable agent communication
 - **Pydantic Models**: Ensures type-safe, structured data flow
 
-## 🤖 Plugin Architecture
+## Plugin Architecture
 
 ### Agent Functions
 
@@ -54,19 +54,19 @@ This implementation demonstrates modern Semantic Kernel plugins for multi-agent 
 | **Agent 2** | **TravelAdvisor** | `request_missing_info` | Requests missing info using structured function calling |
 | **Agent 2** | **TravelAdvisor** | `enhance_itinerary`    | Enhances itineraries with additional details            |
 
-## 🔄 Workflow
+## Workflow
 
 ```mermaid
 graph TD
-    A[🎯 User Request] --> B[🤖 Agent 1<br/>TravelPlanner.analyze_request]
-    B --> C{📋 Complete Info?}
-    C -->|✅ Yes| D[✈️ Agent 2<br/>TravelAdvisor.create_itinerary]
-    C -->|❌ No| E[❓ Agent 2<br/>TravelAdvisor.request_missing_info]
-    E --> F[💡 Agent 1<br/>TravelPlanner.provide_defaults]
-    F --> G[🔄 Updated Data]
+    A[User Request] --> B[Agent 1<br/>TravelPlanner.analyze_request]
+    B --> C{Complete Info?}
+    C -->|Yes| D[Agent 2<br/>TravelAdvisor.create_itinerary]
+    C -->|No| E[Agent 2<br/>TravelAdvisor.request_missing_info]
+    E --> F[Agent 1<br/>TravelPlanner.provide_defaults]
+    F --> G[Updated Data]
     G --> D
-    D --> H[✨ Agent 2<br/>TravelAdvisor.enhance_itinerary]
-    H --> I[🎉 Final Enhanced Itinerary]
+    D --> H[Agent 2<br/>TravelAdvisor.enhance_itinerary]
+    H --> I[Final Enhanced Itinerary]
 
     style A fill:#e3f2fd
     style B fill:#f3e5f5
@@ -79,7 +79,7 @@ graph TD
     style I fill:#e8f5e8
 ```
 
-## 🚀 Function Calling and Pydantic
+## Function Calling and Pydantic
 
 ### Function Calling
 
@@ -151,14 +151,14 @@ travel_data = result.value[0].content  # Already a TravelAnalysis object
 
 ### Benefits
 
-1. **✅ Reliability**: Structured data ensures consistent communication
-2. **✅ Type Safety**: Pydantic models ensure data consistency
-3. **✅ Better Error Handling**: Proper validation and error messages
-4. **✅ Scalability**: Easy to add new functions and models
-5. **✅ Debugging**: Clear logging of structured data flow
-6. **✅ Modern**: Uses OpenAI's native function calling capabilities
+1. **Reliability**: Structured data ensures consistent communication
+2. **Type Safety**: Pydantic models ensure data consistency
+3. **Better Error Handling**: Proper validation and error messages
+4. **Scalability**: Easy to add new functions and models
+5. **Debugging**: Clear logging of structured data flow
+6. **Modern**: Uses OpenAI's native function calling capabilities
 
-## 🏗️ Implementation
+## Implementation
 
 ### Core Components
 
@@ -195,7 +195,7 @@ defaults_result = await kernel.invoke("TravelPlanner", "provide_defaults", input
 enhanced_result = await kernel.invoke("TravelAdvisor", "enhance_itinerary", input=final_response)
 ```
 
-## 🚀 Usage
+## Usage
 
 ### Quick Start
 
@@ -215,27 +215,27 @@ python3 travel_planner.py
 **Request with missing duration:**
 
 ```
-✈️ Your travel request: Plan a trip to Japan for cherry blossoms
+Your travel request: Plan a trip to Japan for cherry blossoms
 
-🤖 [AGENT 1] TravelPlanner.analyze_request: Extracts structured JSON with missing duration
-🤖 [AGENT 2] TravelAdvisor.create_itinerary: Detects missing info using structured data
-🤖 [AGENT 2] TravelAdvisor.request_missing_info: Uses structured function calling to request missing info
-🤖 [AGENT 1] TravelPlanner.provide_defaults: Provides structured default "7 days"
-🤖 [AGENT 2] TravelAdvisor.create_itinerary: Creates itinerary with 7-day duration
-🤖 [AGENT 2] TravelAdvisor.enhance_itinerary: Enhances with specific details
+[AGENT 1] TravelPlanner.analyze_request: Extracts structured JSON with missing duration
+[AGENT 2] TravelAdvisor.create_itinerary: Detects missing info using structured data
+[AGENT 2] TravelAdvisor.request_missing_info: Uses structured function calling to request missing info
+[AGENT 1] TravelPlanner.provide_defaults: Provides structured default "7 days"
+[AGENT 2] TravelAdvisor.create_itinerary: Creates itinerary with 7-day duration
+[AGENT 2] TravelAdvisor.enhance_itinerary: Enhances with specific details
 ```
 
 **Request with complete info:**
 
 ```
-✈️ Your travel request: Plan a 5-day trip to Paris
+Your travel request: Plan a 5-day trip to Paris
 
-🤖 [AGENT 1] TravelPlanner.analyze_request: Extracts complete structured JSON
-🤖 [AGENT 2] TravelAdvisor.create_itinerary: Creates itinerary directly with structured data
-🤖 [AGENT 2] TravelAdvisor.enhance_itinerary: Enhances with specific details
+[AGENT 1] TravelPlanner.analyze_request: Extracts complete structured JSON
+[AGENT 2] TravelAdvisor.create_itinerary: Creates itinerary directly with structured data
+[AGENT 2] TravelAdvisor.enhance_itinerary: Enhances with specific details
 ```
 
-## 📊 Key Features
+## Key Features
 
 ### 1. **Modern Function Calling**
 
@@ -268,7 +268,7 @@ python3 travel_planner.py
 - Graceful fallback for parsing errors
 - Comprehensive debug logging with agent identification
 
-## 🎓 Learning Outcomes
+## Learning Outcomes
 
 ### Semantic Kernel Plugin Concepts
 
@@ -285,7 +285,7 @@ python3 travel_planner.py
 3. **State Management**: Updating structured JSON data between plugin functions
 4. **Error Recovery**: Graceful handling of structured validation failures
 
-## 📚 References
+## References
 
 - [Microsoft Semantic Kernel](https://github.com/microsoft/semantic-kernel)
 - [KernelPlugin Documentation](https://learn.microsoft.com/en-us/semantic-kernel/agents/using-the-sdk/plugins)
