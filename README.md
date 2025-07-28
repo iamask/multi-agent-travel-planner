@@ -37,60 +37,84 @@ graph TD
     style J fill:#e1f5fe
 ```
 
-## 🏗️ Semantic Kernel Implementation
+## 🏗️ Implementation Approaches
 
-### Core Components
+### Approach 1: Basic Semantic Kernel Functions (travel_planner.py)
+
+**Current implementation** uses `KernelFunctionFromPrompt` to create individual functions:
 
 ```python
-# Kernel setup with OpenAI service
-kernel = Kernel()
-kernel.add_service(OpenAIChatCompletion(ai_model_id="gpt-4o-mini"))
-
-# Agent creation using KernelFunctionFromPrompt
+# Create individual functions
 travel_planner = KernelFunctionFromPrompt(
     function_name="travel_planner",
     prompt=travel_planner_prompt,
     description="Analyzes travel requests and returns structured JSON data"
 )
+
+# Invoke functions directly
+planner_result = await kernel.invoke(travel_planner, input=user_request)
 ```
 
-### Agent-to-Agent Communication
+**Pros:**
+
+- Simple and straightforward
+- Easy to understand for beginners
+- Direct function invocation
+
+**Cons:**
+
+- No plugin organization
+- Functions are scattered in code
+- Less scalable for complex systems
+
+### Approach 2: Semantic Kernel Plugins (travel_planner_with_plugins.py)
+
+**Proper plugin implementation** uses `KernelPlugin` to organize related functions:
 
 ```python
-# Agent 2 asks Agent 1 for missing info
-if advisor_response.startswith("AGENT1_QUERY:"):
-    query = advisor_response.replace("AGENT1_QUERY:", "").strip()
+# Create plugin with multiple functions
+travel_planner_plugin = KernelPlugin(
+    name="TravelPlanner",
+    description="Plugin for analyzing travel requests and providing default values",
+    functions=[analyze_request_function, provide_defaults_function]
+)
 
-    # Agent 1 provides defaults
-    followup_result = await kernel.invoke(travel_planner_followup, input=query)
-    defaults_response = followup_result.value[0].content
+# Add plugin to kernel
+kernel.add_plugin(travel_planner_plugin)
 
-    # Update travel data with defaults
-    travel_data["duration"] = defaults_data["defaults"]["duration"]
+# Invoke plugin functions with namespace
+planner_result = await kernel.invoke("TravelPlanner", "analyze_request", input=user_request)
 ```
 
-### Default Value System
+**Pros:**
 
-```python
-# Agent 1 Follow-up provides sensible defaults
-{
-    "defaults": {
-        "duration": "7 days",
-        "budget": "moderate",
-        "accommodation": "hotel",
-        "transportation": "public transport"
-    }
-}
-```
+- Proper Semantic Kernel plugin architecture
+- Organized function grouping
+- Better scalability and maintainability
+- Clear namespace separation
+- Follows Semantic Kernel best practices
+
+**Cons:**
+
+- More complex setup
+- Requires understanding of plugin concepts
 
 ## 🚀 Usage
 
-### Quick Start
+### Quick Start - Basic Approach
 
 ```bash
 # Setup environment
 source venv/bin/activate
 python3 travel_planner.py
+```
+
+### Quick Start - Plugin Approach
+
+```bash
+# Setup environment
+source venv/bin/activate
+python3 travel_planner_with_plugins.py
 ```
 
 ### Example Interactions
@@ -140,24 +164,53 @@ python3 travel_planner.py
 ### File Structure
 
 ```
-travel_planner.py          # Main application
-├── create_travel_planner_agent()      # Agent 1: Analyzer
-├── create_travel_advisor_agent()      # Agent 2: Itinerary Creator
-├── create_travel_planner_followup_agent() # Agent 1: Default Provider
-└── run_multi_agent_workflow()         # Orchestration
+travel_planner.py                    # Basic approach with functions
+travel_planner_with_plugins.py       # Plugin-based approach
+├── create_travel_planner_agent()    # Agent 1: Analyzer (basic)
+├── create_travel_advisor_agent()    # Agent 2: Itinerary Creator (basic)
+├── create_travel_planner_plugin()   # TravelPlanner Plugin (plugin approach)
+├── create_travel_advisor_plugin()   # TravelAdvisor Plugin (plugin approach)
+└── run_multi_agent_workflow()      # Orchestration
 ```
 
-### Agent Functions
+### Plugin Architecture (Plugin Approach)
 
 ```python
-# Agent 1: TravelPlanner
-def create_travel_planner_agent(kernel: Kernel) -> KernelFunctionFromPrompt
+# TravelPlanner Plugin
+travel_planner_plugin = KernelPlugin(
+    name="TravelPlanner",
+    functions=[
+        analyze_request_function,      # analyze_request
+        provide_defaults_function     # provide_defaults
+    ]
+)
 
-# Agent 2: TravelAdvisor
-def create_travel_advisor_agent(kernel: Kernel) -> KernelFunctionFromPrompt
+# TravelAdvisor Plugin
+travel_advisor_plugin = KernelPlugin(
+    name="TravelAdvisor",
+    functions=[
+        create_itinerary_function,    # create_itinerary
+        enhance_itinerary_function    # enhance_itinerary
+    ]
+)
+```
 
-# Agent 1 Follow-up: Default Provider
-def create_travel_planner_followup_agent(kernel: Kernel) -> KernelFunctionFromPrompt
+### Function Invocation Comparison
+
+**Basic Approach:**
+
+```python
+# Direct function invocation
+planner_result = await kernel.invoke(travel_planner, input=user_request)
+advisor_result = await kernel.invoke(travel_advisor, input=json_response)
+```
+
+**Plugin Approach:**
+
+```python
+# Plugin-based invocation with namespaces
+planner_result = await kernel.invoke("TravelPlanner", "analyze_request", input=user_request)
+advisor_result = await kernel.invoke("TravelAdvisor", "create_itinerary", input=json_response)
 ```
 
 ## 🎓 Learning Outcomes
@@ -165,10 +218,11 @@ def create_travel_planner_followup_agent(kernel: Kernel) -> KernelFunctionFromPr
 ### Semantic Kernel Concepts
 
 1. **KernelFunctionFromPrompt**: Creating agents from prompts
-2. **Kernel Services**: Adding OpenAI services to kernels
-3. **Async Invocation**: Using `await kernel.invoke()`
-4. **JSON Parsing**: Handling structured responses
-5. **Agent Communication**: Multi-step workflows
+2. **KernelPlugin**: Organizing functions into plugins
+3. **Kernel Services**: Adding OpenAI services to kernels
+4. **Async Invocation**: Using `await kernel.invoke()`
+5. **JSON Parsing**: Handling structured responses
+6. **Agent Communication**: Multi-step workflows
 
 ### Multi-Agent Patterns
 
@@ -182,21 +236,23 @@ def create_travel_planner_followup_agent(kernel: Kernel) -> KernelFunctionFromPr
 The system includes comprehensive logging:
 
 ```
-[DEBUG] 🔄 Step 1: TravelPlanner analyzing request...
+[DEBUG] 🔄 Step 1: TravelPlanner.analyze_request analyzing request...
 [DEBUG] 📋 TravelPlanner JSON response: {"destination": "Japan", "duration": null, "missing_info": ["duration"]}
-[DEBUG] 🔄 Step 2: TravelAdvisor processing JSON...
-[DEBUG] 🔄 Step 3: Agent 2 asking Agent 1 for missing info...
-[DEBUG] 🔄 Step 4: TravelPlanner Follow-up providing defaults...
+[DEBUG] 🔄 Step 2: TravelAdvisor.create_itinerary processing JSON...
+[DEBUG] 🔄 Step 3: TravelAdvisor asking TravelPlanner for missing info...
+[DEBUG] 🔄 Step 4: TravelPlanner.provide_defaults providing defaults...
 [DEBUG] 📋 Updated JSON with defaults: {"duration": "7 days"}
-[DEBUG] 🔄 Step 5: TravelAdvisor creating final itinerary...
+[DEBUG] 🔄 Step 5: TravelAdvisor.create_itinerary creating final itinerary...
+[DEBUG] 🔄 Step 6: TravelAdvisor.enhance_itinerary enhancing itinerary...
 ```
 
 ## 📚 References
 
 - [Microsoft Semantic Kernel](https://github.com/microsoft/semantic-kernel)
+- [KernelPlugin Documentation](https://learn.microsoft.com/en-us/semantic-kernel/agents/using-the-sdk/plugins)
 - [KernelFunctionFromPrompt Documentation](https://learn.microsoft.com/en-us/semantic-kernel/agents/using-the-sdk/agents)
 - [OpenAI Integration](https://learn.microsoft.com/en-us/semantic-kernel/ai-services/openai)
 
 ---
 
-**Note**: This implementation demonstrates advanced multi-agent communication patterns using Microsoft Semantic Kernel's function-based approach.
+**Note**: This implementation demonstrates both basic Semantic Kernel functions and proper plugin-based approaches for multi-agent communication patterns.
