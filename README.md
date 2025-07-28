@@ -4,11 +4,11 @@ A sophisticated multi-agent system demonstrating **proper Semantic Kernel plugin
 
 ## 🎯 System Overview
 
-This implementation demonstrates the **modern way** to use Semantic Kernel plugins for multi-agent workflows with OpenAI function calling:
+This implementation demonstrates the **modern way** to use Semantic Kernel plugins for multi-agent workflows with function calling:
 
-- **TravelPlanner Plugin (Agent 1)**: Contains functions for analyzing travel requests and providing defaults
-- **TravelAdvisor Plugin (Agent 2)**: Contains functions for creating and enhancing itineraries
-- **OpenAI Function Calling**: Uses structured function calls instead of legacy string parsing
+- **Agent 1 - TravelPlanner Plugin**: Analyzes travel requests and provides default values
+- **Agent 2 - TravelAdvisor Plugin**: Creates and enhances detailed itineraries
+- **Function Calling**: Uses structured function calls for reliable agent communication
 - **Proper namespace separation**: `TravelPlanner.analyze_request`, `TravelAdvisor.create_itinerary`
 
 ## 🤖 Plugin Architecture
@@ -16,20 +16,20 @@ This implementation demonstrates the **modern way** to use Semantic Kernel plugi
 ### Plugin Structure
 
 ```python
-# TravelPlanner Plugin (Agent 1)
+# Agent 1 - TravelPlanner Plugin
 travel_planner_plugin = KernelPlugin(
     name="TravelPlanner",
-    description="Plugin for analyzing travel requests and providing default values",
+    description="Agent 1: Plugin for analyzing travel requests and providing default values",
     functions=[
         analyze_request_function,      # TravelPlanner.analyze_request
         provide_defaults_function     # TravelPlanner.provide_defaults
     ]
 )
 
-# TravelAdvisor Plugin (Agent 2)
+# Agent 2 - TravelAdvisor Plugin
 travel_advisor_plugin = KernelPlugin(
     name="TravelAdvisor",
-    description="Plugin for creating and enhancing travel itineraries",
+    description="Agent 2: Plugin for creating and enhancing travel itineraries",
     functions=[
         create_itinerary_function,        # TravelAdvisor.create_itinerary
         request_missing_info_function,    # TravelAdvisor.request_missing_info
@@ -40,28 +40,28 @@ travel_advisor_plugin = KernelPlugin(
 
 ### Agent Functions by Plugin
 
-| Plugin            | Function               | Purpose                                                 |
-| ----------------- | ---------------------- | ------------------------------------------------------- |
-| **TravelPlanner** | `analyze_request`      | Analyzes user input and returns structured JSON         |
-| **TravelPlanner** | `provide_defaults`     | Provides default values for missing information         |
-| **TravelAdvisor** | `create_itinerary`     | Creates detailed travel itineraries from JSON           |
-| **TravelAdvisor** | `request_missing_info` | Requests missing info using structured function calling |
-| **TravelAdvisor** | `enhance_itinerary`    | Enhances itineraries with additional details            |
+| Agent       | Plugin            | Function               | Purpose                                                 |
+| ----------- | ----------------- | ---------------------- | ------------------------------------------------------- |
+| **Agent 1** | **TravelPlanner** | `analyze_request`      | Analyzes user input and returns structured JSON         |
+| **Agent 1** | **TravelPlanner** | `provide_defaults`     | Provides default values for missing information         |
+| **Agent 2** | **TravelAdvisor** | `create_itinerary`     | Creates detailed travel itineraries from JSON           |
+| **Agent 2** | **TravelAdvisor** | `request_missing_info` | Requests missing info using structured function calling |
+| **Agent 2** | **TravelAdvisor** | `enhance_itinerary`    | Enhances itineraries with additional details            |
 
 ## 🔄 Workflow Diagram
 
 ```mermaid
 graph TD
-    A[User Request] --> B[TravelPlanner.analyze_request]
+    A[User Request] --> B[Agent 1: TravelPlanner.analyze_request]
     B --> C{Complete Info?}
-    C -->|Yes| D[TravelAdvisor.create_itinerary]
-    C -->|No| E[TravelAdvisor.request_missing_info]
+    C -->|Yes| D[Agent 2: TravelAdvisor.create_itinerary]
+    C -->|No| E[Agent 2: TravelAdvisor.request_missing_info]
     E --> F[Structured Request JSON]
-    F --> G[TravelPlanner.provide_defaults]
+    F --> G[Agent 1: TravelPlanner.provide_defaults]
     G --> H[Default Values JSON]
     H --> I[Updated JSON]
     I --> D
-    D --> J[TravelAdvisor.enhance_itinerary]
+    D --> J[Agent 2: TravelAdvisor.enhance_itinerary]
     J --> K[Final Enhanced Itinerary]
 
     style A fill:#e1f5fe
@@ -73,19 +73,11 @@ graph TD
     style K fill:#e1f5fe
 ```
 
-## 🚀 Modern OpenAI Function Calling
+## 🚀 Function Calling and Pydantic
 
-### Why OpenAI Function Calling?
+### Function Calling
 
-The system now uses **OpenAI's native function calling** instead of legacy string parsing:
-
-**❌ Legacy Approach (Unreliable):**
-
-```python
-# Unreliable string parsing
-if advisor_response.startswith("TRAVELPLANNER_QUERY:"):
-    query = advisor_response.replace("TRAVELPLANNER_QUERY:", "").strip()
-```
+Function calling is a modern approach to AI agent communication that uses structured data for reliable agent-to-agent communication. This system leverages **OpenAI's native function calling** capabilities to ensure type-safe communication between agents.
 
 **✅ Modern Approach (Reliable):**
 
@@ -100,7 +92,9 @@ if travel_data.get("missing_info") and len(travel_data["missing_info"]) > 0:
     )
 ```
 
-### Structured Models for Function Calling
+### Pydantic Models for Structured Output
+
+The system uses **Pydantic models** with Semantic Kernel's `KernelBaseModel` for type-safe, structured communication:
 
 ```python
 # Pydantic models for structured output using Semantic Kernel
@@ -133,16 +127,16 @@ class ItineraryRequest(KernelBaseModel):
     reason: str = Field(description="Reason why this information is needed")
 ```
 
-### Benefits of OpenAI Function Calling
+### Benefits of Function Calling and Pydantic
 
-1. **✅ Reliability**: No more string parsing that can break
-2. **✅ Type Safety**: Structured models ensure data consistency
+1. **✅ Reliability**: Structured data ensures consistent communication
+2. **✅ Type Safety**: Pydantic models ensure data consistency
 3. **✅ Better Error Handling**: Proper validation and error messages
 4. **✅ Scalability**: Easy to add new functions and models
 5. **✅ Debugging**: Clear logging of structured data flow
 6. **✅ Modern**: Uses OpenAI's native function calling capabilities
 
-### How OpenAI Function Calling Works
+### How Function Calling Works with Pydantic
 
 #### 1. **Structured Model Definition**
 
@@ -150,8 +144,8 @@ class ItineraryRequest(KernelBaseModel):
 class TravelAnalysis(KernelBaseModel):
     """
     Structured output model for travel request analysis.
-    Used by TravelPlanner agent to return structured JSON data.
-    This model ensures type-safe communication between agents using OpenAI function calling.
+    Used by Agent 1 (TravelPlanner) to return structured JSON data.
+    This model ensures type-safe communication between agents using function calling.
     """
     destination: str = Field(description="The destination for the trip")
     duration: Optional[str] = Field(default=None, description="Duration of the trip")
@@ -159,18 +153,18 @@ class TravelAnalysis(KernelBaseModel):
     missing_info: List[str] = Field(default_factory=list, description="List of missing critical information")
 ```
 
-#### 2. **Function Configuration with OpenAI Function Calling**
+#### 2. **Function Configuration with Pydantic**
 
 ```python
-# Configure execution settings for structured output using OpenAI function calling
+# Configure execution settings for structured output using Pydantic models
 req_settings = kernel.get_prompt_execution_settings_from_service_id(service_id="default")
 req_settings.temperature = 0.1  # Low temperature for consistent structured output
-req_settings.response_format = TravelAnalysis  # Enforce JSON schema compliance using OpenAI function calling
+req_settings.response_format = TravelAnalysis  # Enforce JSON schema compliance using Pydantic
 
 analyze_request_function = KernelFunctionFromPrompt(
     function_name="analyze_request",
     prompt=analyze_request_prompt,
-    description="Analyzes travel requests and returns structured JSON data using OpenAI function calling",
+    description="Agent 1: Analyzes travel requests and returns structured JSON data using function calling",
     prompt_execution_settings=req_settings
 )
 ```
@@ -178,9 +172,9 @@ analyze_request_function = KernelFunctionFromPrompt(
 #### 3. **Structured Function Invocation**
 
 ```python
-# Agent Tool Call: TravelPlanner.analyze_request using OpenAI function calling
+# Agent 1 Tool Call: TravelPlanner.analyze_request using function calling
 # This agent function uses structured output to ensure consistent JSON responses
-# OpenAI function calling provides reliable, type-safe communication
+# Function calling provides reliable, type-safe communication
 planner_result = await kernel.invoke(plugin_name="TravelPlanner", function_name="analyze_request", input=user_request)
 json_response = planner_result.value[0].content
 ```
@@ -188,33 +182,22 @@ json_response = planner_result.value[0].content
 #### 4. **Structured Response Parsing**
 
 ```python
-# The response is already a TravelAnalysis object from OpenAI function calling, convert to dict
+# The response is already a TravelAnalysis object from function calling, convert to dict
 travel_data = json_response.model_dump() if hasattr(json_response, 'model_dump') else json.loads(json_response)
 ```
-
-### Function Calling Benefits Comparison
-
-| Feature            | Legacy String Parsing | OpenAI Function Calling |
-| ------------------ | --------------------- | ----------------------- |
-| **Reliability**    | ❌ Unreliable         | ✅ Reliable             |
-| **Type Safety**    | ❌ No validation      | ✅ Structured models    |
-| **Error Handling** | ❌ Basic              | ✅ Comprehensive        |
-| **Debugging**      | ❌ Difficult          | ✅ Clear logging        |
-| **Scalability**    | ❌ Limited            | ✅ High                 |
-| **Best Practices** | ❌ Legacy             | ✅ Modern               |
 
 ### Function Calling Workflow
 
 ```mermaid
 graph TD
-    A[User Input] --> B[TravelPlanner.analyze_request]
+    A[User Input] --> B[Agent 1: TravelPlanner.analyze_request]
     B --> C{Missing Info?}
-    C -->|Yes| D[TravelAdvisor.request_missing_info]
-    C -->|No| E[TravelAdvisor.create_itinerary]
-    D --> F[TravelPlanner.provide_defaults]
+    C -->|Yes| D[Agent 2: TravelAdvisor.request_missing_info]
+    C -->|No| E[Agent 2: TravelAdvisor.create_itinerary]
+    D --> F[Agent 1: TravelPlanner.provide_defaults]
     F --> G[Updated Data]
     G --> E
-    E --> H[TravelAdvisor.enhance_itinerary]
+    E --> H[Agent 2: TravelAdvisor.enhance_itinerary]
     H --> I[Final Response]
 
     style A fill:#e1f5fe
@@ -226,7 +209,7 @@ graph TD
     style I fill:#e1f5fe
 ```
 
-## 🤖 Agent-to-Agent Communication with OpenAI Function Calling
+## 🤖 Agent-to-Agent Communication with Function Calling
 
 ### How Modern Plugin Communication Works
 
@@ -286,11 +269,11 @@ if travel_data.get("missing_info") and len(travel_data["missing_info"]) > 0:
 
 ```python
 # Agent 1 → Agent 2 → Agent 1 → Agent 2 (with structured function calling)
-step1 = await kernel.invoke("TravelPlanner", "analyze_request", input=request)
-step2 = await kernel.invoke("TravelAdvisor", "create_itinerary", input=step1_result)
-step3 = await kernel.invoke("TravelAdvisor", "request_missing_info", input=missing_items)
-step4 = await kernel.invoke("TravelPlanner", "provide_defaults", input=step3_result)
-step5 = await kernel.invoke("TravelAdvisor", "enhance_itinerary", input=final_result)
+step1 = await kernel.invoke("TravelPlanner", "analyze_request", input=request)  # Agent 1
+step2 = await kernel.invoke("TravelAdvisor", "create_itinerary", input=step1_result)  # Agent 2
+step3 = await kernel.invoke("TravelAdvisor", "request_missing_info", input=missing_items)  # Agent 2
+step4 = await kernel.invoke("TravelPlanner", "provide_defaults", input=step3_result)  # Agent 1
+step5 = await kernel.invoke("TravelAdvisor", "enhance_itinerary", input=final_result)  # Agent 2
 ```
 
 #### **Pattern 2: Conditional Communication with Structured Data**
@@ -298,10 +281,10 @@ step5 = await kernel.invoke("TravelAdvisor", "enhance_itinerary", input=final_re
 ```python
 # Agent 2 decides whether to ask Agent 1 for help using structured data
 if travel_data.get("missing_info") and len(travel_data["missing_info"]) > 0:
-    # Use structured function calling to request missing info
+    # Agent 2 uses structured function calling to request missing info from Agent 1
     request_result = await kernel.invoke("TravelAdvisor", "request_missing_info", input=missing_info)
 else:
-    # Process directly with complete data
+    # Agent 2 processes directly with complete data
     result = await kernel.invoke("TravelAdvisor", "create_itinerary", input=complete_data)
 ```
 
@@ -325,11 +308,11 @@ updated_json = json.dumps(travel_data)
 
 ### Logic Flow Explanation
 
-#### **Step 1: Request Analysis (TravelPlanner.analyze_request)**
+#### **Step 1: Request Analysis (Agent 1 - TravelPlanner.analyze_request)**
 
 ```python
 # Input: "Plan a trip to Japan for cherry blossoms"
-# Logic: Extract structured information using OpenAI function calling
+# Logic: Agent 1 extracts structured information using function calling
 # Output: Structured JSON with missing_info array
 {
     "destination": "Japan",
@@ -339,24 +322,24 @@ updated_json = json.dumps(travel_data)
 }
 ```
 
-#### **Step 2: Itinerary Creation (TravelAdvisor.create_itinerary)**
+#### **Step 2: Itinerary Creation (Agent 2 - TravelAdvisor.create_itinerary)**
 
 ```python
-# Input: JSON from TravelPlanner
-# Logic: Check if complete information available using structured data
+# Input: JSON from Agent 1 (TravelPlanner)
+# Logic: Agent 2 checks if complete information available using structured data
 if travel_data.get("missing_info") and len(travel_data["missing_info"]) > 0:
-    # Use structured function calling to request missing info
+    # Agent 2 uses structured function calling to request missing info
     request_result = await kernel.invoke("TravelAdvisor", "request_missing_info", input=missing_info)
 else:
-    # Create complete itinerary directly
+    # Agent 2 creates complete itinerary directly
     return detailed_itinerary
 ```
 
-#### **Step 3: Missing Info Request (TravelAdvisor.request_missing_info)**
+#### **Step 3: Missing Info Request (Agent 2 - TravelAdvisor.request_missing_info)**
 
 ```python
 # Input: Missing information list
-# Logic: Create structured request using OpenAI function calling
+# Logic: Agent 2 creates structured request using function calling
 # Output: Structured JSON with missing items and reason
 {
     "missing_items": ["duration"],
@@ -364,11 +347,11 @@ else:
 }
 ```
 
-#### **Step 4: Default Provision (TravelPlanner.provide_defaults)**
+#### **Step 4: Default Provision (Agent 1 - TravelPlanner.provide_defaults)**
 
 ```python
-# Input: Structured request from TravelAdvisor
-# Logic: Provide sensible defaults using OpenAI function calling
+# Input: Structured request from Agent 2 (TravelAdvisor)
+# Logic: Agent 1 provides sensible defaults using function calling
 # Output: Structured JSON with default values
 {
     "duration": "7 days",
@@ -381,20 +364,20 @@ else:
 #### **Step 5: State Update & Final Processing**
 
 ```python
-# Logic: Merge defaults with original data using structured models
+# Logic: Agent 2 merges defaults with original data using structured models
 travel_data.update(defaults_data)
 
-# Logic: Remove resolved missing_info items
+# Logic: Agent 2 removes resolved missing_info items
 for resolved_item in defaults_data:
     if resolved_item in travel_data["missing_info"]:
         travel_data["missing_info"].remove(resolved_item)
 ```
 
-#### **Step 6: Enhancement (TravelAdvisor.enhance_itinerary)**
+#### **Step 6: Enhancement (Agent 2 - TravelAdvisor.enhance_itinerary)**
 
 ```python
 # Input: Complete itinerary from previous step
-# Logic: Add specific details, locations, costs using OpenAI function calling
+# Logic: Agent 2 adds specific details, locations, costs using function calling
 # Output: Enhanced itinerary with practical details
 ```
 
